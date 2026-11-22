@@ -1,0 +1,964 @@
+[[test]]
+name = "test_circular_pitch"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_circular_pitch() {
+    // circular_pitch from mod: mod * PI
+    assert_approx(circular_pitch(mod=2), 2*PI);
+    // circular_pitch from circ_pitch: identity
+    assert_approx(circular_pitch(circ_pitch=5), 5);
+}
+test_circular_pitch();
+'''
+
+[[test]]
+name = "test_diametral_pitch"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_diametral_pitch() {
+    // diametral pitch from circ_pitch: PI/circ_pitch * INCH
+    cp = 5;
+    dp = diametral_pitch(circ_pitch=cp);
+    assert(dp > 0);
+    // from mod: PI/(mod*PI)*INCH = INCH/mod
+    dp2 = diametral_pitch(mod=2);
+    assert(dp2 > 0);
+}
+test_diametral_pitch();
+'''
+
+[[test]]
+name = "test_module_value"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_module_value() {
+    // module from circ_pitch: circ_pitch / PI
+    assert_approx(module_value(circ_pitch=PI), 1);
+    assert_approx(module_value(mod=3), 3);
+}
+test_module_value();
+'''
+
+[[test]]
+name = "test_pitch_radius"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_pitch_radius() {
+    // pitch_radius = circ_pitch * teeth / (2*PI)
+    pr = pitch_radius(mod=2, teeth=20);
+    assert_approx(pr, 20);  // mod*teeth/2 = 2*20/2 = 20
+}
+test_pitch_radius();
+'''
+
+[[test]]
+name = "test_outer_radius"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_outer_radius() {
+    // outer_radius > pitch_radius for external gears
+    pr = pitch_radius(mod=2, teeth=20);
+    or = outer_radius(mod=2, teeth=20);
+    assert(or > pr);
+}
+test_outer_radius();
+'''
+
+[[test]]
+name = "test_root_radius"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_root_radius() {
+    // root_radius < pitch_radius for external gears
+    pr = pitch_radius(mod=2, teeth=20);
+    rr = root_radius(mod=2, teeth=20);
+    assert(rr < pr);
+}
+test_root_radius();
+'''
+
+[[test]]
+name = "test_bevel_pitch_angle"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_bevel_pitch_angle() {
+    // Equal teeth → 45° pitch angle at 90° drive angle
+    angle = bevel_pitch_angle(teeth=20, mate_teeth=20);
+    assert_approx(angle, 45);
+    // More mate teeth → smaller pitch angle
+    angle2 = bevel_pitch_angle(teeth=10, mate_teeth=20);
+    assert(angle2 < 45);
+}
+test_bevel_pitch_angle();
+'''
+
+[[test]]
+name = "test_gear_dist"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_gear_dist() {
+    // Standard center distance = sum of pitch radii
+    d = gear_dist(mod=2, teeth1=20, teeth2=20);
+    pr = pitch_radius(mod=2, teeth=20);
+    assert_approx(d, 2*pr);
+}
+test_gear_dist();
+'''
+
+[[test]]
+name = "test_auto_profile_shift"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_auto_profile_shift() {
+    // Large tooth count → zero shift
+    ps = auto_profile_shift(teeth=30);
+    assert(is_num(ps));
+    assert(ps <= 1);
+}
+test_auto_profile_shift();
+'''
+
+[[test]]
+name = "test_get_profile_shift"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_get_profile_shift() {
+    // Use ring+spur example from docs: ring=57 teeth, spur=25 teeth, mod=2, desired=34
+    // internal1=true means ring gear; returns ~1.2
+    ps = get_profile_shift(desired=34, teeth1=57, teeth2=25, mod=2, internal1=true);
+    assert(is_num(ps));
+    assert(ps > 0);
+}
+test_get_profile_shift();
+'''
+
+[[test]]
+name = "test_gear_shorten"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_gear_shorten() {
+    // gear_shorten doesn't take a pitch parameter — uses teeth only
+    gs = gear_shorten(teeth1=20, teeth2=20);
+    assert(is_num(gs));
+}
+test_gear_shorten();
+'''
+
+[[test]]
+name = "test_worm_dist"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_worm_dist() {
+    d = worm_dist(worm_diam=10, worm_starts=1, teeth=20, mod=2);
+    assert(d > 0);
+}
+test_worm_dist();
+'''
+
+
+[[test]]
+name = "test_globoid_worm_dist"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_globoid_worm_dist() {
+    d = globoid_worm_dist(worm_diam=10, worm_starts=1, teeth=20, mod=2);
+    assert(d > 0);
+}
+test_globoid_worm_dist();
+'''
+
+
+[[test]]
+name = "test_spur_gear2d"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_spur_gear2d() {
+    $fn = 4;
+    v = spur_gear2d(mod=2, teeth=12);
+    assert(is_region(v) || is_path(v, 2));
+    assert(len(v) > 0);
+}
+test_spur_gear2d();
+'''
+
+[[test]]
+name = "test_spur_gear"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_spur_gear() {
+    $fn = 4;
+    v = spur_gear(mod=2, teeth=12, thickness=5);
+    assert(is_vnf(v));
+    assert(len(v[0]) > 0);
+}
+test_spur_gear();
+'''
+
+[[test]]
+name = "test_spur_gear_herringbone"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_spur_gear_herringbone() {
+    $fn = 4;
+    // How far the top face's points are from the bottom face's, seen from above.
+    function ends_apart(vnf) = let(
+        zs = [for (p = vnf[0]) p.z],
+        top = [for (p = vnf[0]) if (approx(p.z, max(zs))) point2d(p)],
+        bot = [for (p = vnf[0]) if (approx(p.z, min(zs))) point2d(p)]
+    ) max([for (p = top) min([for (q = bot) norm(p - q)])]);
+    // A herringbone gear's ends are twisted the same way from its middle, so its top face is its bottom face moved up.
+    assert(ends_apart(spur_gear(mod=2, teeth=12, thickness=10, helical=30, herringbone=true)) < 1e-6);
+    // A helical gear's ends are twisted opposite ways.
+    assert(ends_apart(spur_gear(mod=2, teeth=12, thickness=10, helical=30)) > 0.1);
+}
+test_spur_gear_herringbone();
+'''
+
+[[test]]
+name = "test_rack2d"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_rack2d() {
+    // rack2d uses 'backing' for underside height, not 'height'
+    v = rack2d(mod=2, teeth=5, backing=5);
+    assert(is_path(v, 2) || is_region(v));
+}
+test_rack2d();
+'''
+
+[[test]]
+name = "test_rack"
+assert_no_echoes = false
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_rack() {
+    // rack uses 'backing' for underside height
+    // herringbone=true uses sweep() instead of linear_sweep(), avoiding anchor bug
+    v = rack(mod=2, teeth=10, thickness=5, backing=5, helical=20, herringbone=true);
+    assert(is_vnf(v));
+    assert(len(v[0]) > 0);
+    // Teeth point UP, the thickness runs along Y and the end faces are shifted toward -X, as in the module form.
+    hl = 10*PI/cos(20);  // half length
+    shift = 2.5*tan(20);
+    assert_approx(pointlist_bounds(v[0]), [[-hl-shift, -2.5, -7.5], [hl, 2.5, 2]]);
+    back_face = [for (p=v[0]) if (approx(p.y, 2.5)) p];
+    assert_approx(min(column(back_face,0)), -hl-shift);
+}
+test_rack();
+'''
+
+[[test]]
+name = "test_planetary_gears"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_planetary_gears() {
+    // Returns [["sun", z, ps, spin], ["ring", ...], ["planets", ...], ["ratio", ...]]
+    result = planetary_gears(n=3, max_teeth=50, mod=2, ring_carrier=1.5);
+    assert(is_list(result));
+    assert(len(result) == 4);
+    // First entry is sun gear info, second is ring, third is planets, fourth is ratio
+    assert(result[0][0] == "sun");
+    assert(result[1][0] == "ring");
+    assert(result[3][0] == "ratio");
+    // Tooth counts are positive integers
+    assert(is_int(result[0][1]) && result[0][1] > 0);
+    assert(is_int(result[1][1]) && result[1][1] > 0);
+}
+test_planetary_gears();
+'''
+
+[[test]]
+name = "test_crown_gear"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_crown_gear() {
+    $fn = 8;
+    v = crown_gear(mod=2, teeth=20, mate_teeth=9, backing=3, face_width=5);
+    assert(is_vnf(v));
+    assert(len(v[0]) > 0);
+}
+test_crown_gear();
+'''
+
+[[test]]
+name = "test_bevel_gear"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_bevel_gear() {
+    $fn = 8;
+    v = bevel_gear(mod=2, teeth=16, mate_teeth=16);
+    assert(is_vnf(v));
+    assert(len(v[0]) > 0);
+}
+test_bevel_gear();
+'''
+
+
+[[test]]
+name = "test_globoid_worm"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_globoid_worm() {
+    $fn = 8;
+    v = globoid_worm(mod=2, teeth=20, d=20, l=10);    
+    assert(is_vnf(v));
+    assert(len(v[0]) > 0);
+}
+test_globoid_worm();
+'''
+
+
+
+[[test]]
+name = "test_globoid_worm_gear"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_globoid_worm_gear() {
+    $fn = 8;
+    v = globoid_worm_gear(mod=2, teeth=20, worm_diam=20, worm_length=10);        
+    assert(is_vnf(v));
+    assert(len(v[0]) > 0);
+}
+test_globoid_worm_gear();
+'''
+
+
+[[test]]
+name = "test_globoid_worm_root_radius"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_globoid_worm_root_radius() {
+    r=globoid_worm_root_radius(mod=3, d=20, teeth=22, z=2);    
+    assert(r>0);
+}
+test_globoid_worm_root_radius();
+'''
+
+
+[[test]]
+name = "test_worm_root_radius"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_worm_root_radius() {
+    r=worm_root_radius(mod=3, d=20);    
+    assert(r>0);
+}
+test_worm_root_radius();
+'''
+
+
+
+[[test]]
+name = "test_worm_gear"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_worm_gear() {
+    $fn = 8;
+    v = worm_gear(mod=2, teeth=20, worm_diam=20);
+    assert(is_vnf(v));
+    assert(len(v[0]) > 0);
+}
+test_worm_gear();
+'''
+
+[[test]]
+name = "test_gear_dist_skew"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_gear_dist_skew() {
+    d = gear_dist_skew(mod=2, teeth1=15, teeth2=24, helical1=45, helical2=30);
+    assert(is_num(d));
+    assert(d > 0);
+}
+test_gear_dist_skew();
+'''
+
+[[test]]
+name = "test_gear_skew_angle"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_gear_skew_angle() {
+    a = gear_skew_angle(teeth1=15, teeth2=24, helical1=25, helical2=30);
+    assert(is_num(a));
+    assert(a > 0);
+}
+test_gear_skew_angle();
+'''
+
+[[test]]
+name = "test_gear_shorten_skew"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_gear_shorten_skew() {
+    assert_approx(gear_shorten_skew(teeth1=5, teeth2=7, helical1=45, helical2=30),0.236429832966);
+}
+test_gear_shorten_skew();
+'''
+
+[[test]]
+name = "test_worm_outer_radius"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_worm_outer_radius() {
+    // pitch radius plus module
+    assert_approx(worm_outer_radius(mod=2, d=24), 14);
+    assert_approx(worm_outer_radius(mod=2, worm_diam=24), 14);
+    // other tooth size measures give the same result
+    assert_approx(worm_outer_radius(circ_pitch=2*PI, d=24), 14);
+    // larger than the root radius
+    assert(worm_outer_radius(mod=3, d=20) > worm_root_radius(mod=3, d=20));
+}
+test_worm_outer_radius();
+'''
+
+[[test]]
+name = "test_globoid_worm_max_length"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_globoid_worm_max_length() {
+    m=2; N=55; d=24; s=5;
+    cb = sqrt(1-pow(s*m/d,2));
+    R = m*N/(2*cb);
+    // default clearance is module/4
+    assert_approx(globoid_worm_max_length(mod=m, teeth=N, d=d, starts=s),
+                  1.3*(R-m-m/4));
+    // explicit clearance reduces the limit
+    assert_approx(globoid_worm_max_length(mod=m, teeth=N, d=d, starts=s, clearance=1),
+                  1.3*(R-m-1));
+    assert(globoid_worm_max_length(mod=m, teeth=N, d=d, starts=s, clearance=1)
+           < globoid_worm_max_length(mod=m, teeth=N, d=d, starts=s));
+    // aliases
+    assert_approx(globoid_worm_max_length(mod=m, teeth=N, worm_diam=d, worm_starts=s),
+                  globoid_worm_max_length(mod=m, teeth=N, d=d, starts=s));
+}
+test_globoid_worm_max_length();
+'''
+
+[[test]]
+name = "test_globoid_worm_outer_radius"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_globoid_worm_outer_radius() {
+    // At the throat the outer radius is pitch radius plus module
+    assert_approx(globoid_worm_outer_radius(mod=3, d=20, teeth=22, z=0), 13);
+    // Radius grows away from the middle
+    r2 = globoid_worm_outer_radius(mod=3, d=20, teeth=22, z=2);
+    r5 = globoid_worm_outer_radius(mod=3, d=20, teeth=22, z=5);
+    assert(r2 > 13);
+    assert(r5 > r2);
+    // Symmetric about the middle plane
+    assert_approx(globoid_worm_outer_radius(mod=3, d=20, teeth=22, z=-5), r5);
+    // Default z is half the worm length
+    assert_approx(globoid_worm_outer_radius(mod=3, d=20, teeth=22, worm_length=10), r5);
+}
+test_globoid_worm_outer_radius();
+'''
+
+[[test]]
+name = "test_worm_gear_radius_bound"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_worm_gear_radius_bound() {
+    m=2; N=25; d=30; t=12;
+    b = worm_gear_radius_bound(mod=m, teeth=N, thickness=t, worm_diam=d);
+    expected = worm_dist(mod=m, teeth=N, worm_diam=d) - sqrt(pow(d/2-m,2)-pow(t/2,2));
+    assert_approx(b, expected);
+    // Bound must exceed the pitch radius
+    assert(b > N*m/2);
+    // aliases
+    assert_approx(worm_gear_radius_bound(mod=m, teeth=N, thickness=t, d=d), b);
+    // Thicker gear gives a larger bound
+    assert(worm_gear_radius_bound(mod=m, teeth=N, thickness=16, worm_diam=d) > b);
+}
+test_worm_gear_radius_bound();
+'''
+
+[[test]]
+name = "test_globoid_worm_gear_radius_bound"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+module test_globoid_worm_gear_radius_bound() {
+    m=2; N=55; d=24; s=5; L=35; t=12;
+    b = globoid_worm_gear_radius_bound(mod=m, teeth=N, thickness=t, d=d, starts=s, length=L);
+    R = m*N/(2*sqrt(1-pow(s*m/d,2)));
+    a = R+d/2;
+    H = L/2;
+    r = a-sqrt(pow(R+m,2)-H*H);
+    expected = sqrt(pow(a-sqrt(r*r-t*t/4),2)+H*H);
+    assert_approx(b, expected);
+    assert(b > R);
+    // length aliases agree
+    assert_approx(globoid_worm_gear_radius_bound(mod=m, teeth=N, thickness=t, worm_diam=d,
+                                                 worm_starts=s, worm_length=L), b);
+    // "max" selects the maximum supported length
+    Lmax = globoid_worm_max_length(mod=m, teeth=N, d=d, starts=s);
+    assert_approx(globoid_worm_gear_radius_bound(mod=m, teeth=N, thickness=t, d=d, starts=s, length="max"),
+                  globoid_worm_gear_radius_bound(mod=m, teeth=N, thickness=t, d=d, starts=s, length=Lmax));
+}
+test_globoid_worm_gear_radius_bound();
+'''
+
+[[test]]
+name = "test_globoid_worm_pressure_angle_limit"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+limit = globoid_worm_pressure_angle_limit(.1,mod=2,teeth=20,worm_diam=16,clearance=.5);
+assert(is_finite(limit) && limit>40 && limit<50);
+// A uniform change of length units must not change the angular limit.
+assert_approx(globoid_worm_pressure_angle_limit(.1,mod=6,teeth=20,worm_diam=48,clearance=1.5),limit);
+assert_approx(globoid_worm_pressure_angle_limit(.1,circ_pitch=2*PI,mate_teeth=20,d=16,starts=1,clearance=.5),limit);
+assert_approx(globoid_worm_pressure_angle_limit(.1,mod=2,teeth=20,worm_root_diam=11,clearance=.5),limit);
+assert(globoid_worm_pressure_angle_limit(.1,mod=2,teeth=20,worm_diam=16,clearance=.2)>limit);
+assert(globoid_worm_pressure_angle_limit(20,mod=2,teeth=20,worm_diam=16,clearance=.5)<limit);
+assert(is_undef(globoid_worm_pressure_angle_limit(89,mod=2,teeth=20,worm_diam=16)));
+multi = globoid_worm_pressure_angle_limit(.1,mod=2,teeth=20,worm_diam=16,worm_starts=3);
+assert(is_finite(multi) && multi>0 && multi<90);
+'''
+
+[[test]]
+name = "test_globoid_worm_pressure_angle_limit_invalid_angle_errors"
+expect_success = false
+script = '''
+include <../std.scad>
+include <../gears.scad>
+echo(globoid_worm_pressure_angle_limit(0,mod=2,teeth=20,worm_diam=16));
+'''
+
+[[test]]
+name = "test_worm_face_dist"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+assert_equal(worm_face_dist(20),10);
+assert_equal(worm_face_dist(d=20),10);
+assert_equal(worm_face_dist(worm_root_diam=15,mod=2),10);
+assert_equal(worm_face_dist(worm_root_diam=15,mod=2,clearance=1),10.5);
+let($parent_gear_worm_diam=30) {
+    assert_equal(worm_face_dist(),15);
+    assert_equal(worm_face_dist(20),10);
+    assert_equal(worm_face_dist(worm_root_diam=15,mod=2),10);
+}
+'''
+
+[[test]]
+name = "test_worm_face_dist_conflicting_diameters_errors"
+expect_success = false
+script = '''
+include <../std.scad>
+include <../gears.scad>
+echo(worm_face_dist(worm_diam=20,worm_root_diam=15,mod=2));
+'''
+
+[[test]]
+name = "test_worm_face_gear_info"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+auto = worm_face_gear_info(40,20,mod=2);
+d = struct_val(auto,"gear_diam");
+e = struct_val(auto,"shaft_offset");
+w = struct_val(auto,"face_width");
+assert_approx(w,3*2*PI/sqrt(1-pow(2/20,2)));
+assert(d>2*w && e>=0);
+assert_approx(struct_val(auto,"band_radius"),d/2-w/2);
+assert_approx(struct_val(auto,"worm_pos"),struct_val(auto,"mesh_center"));
+assert_approx(mean(struct_val(auto,"thread_span")),0);
+assert(struct_val(auto,"overlap")>=1.5);
+reused = worm_face_gear_info(40,20,mod=2,gear_diam=d,shaft_offset=e,face_width=w);
+for(key=["gear_diam","shaft_offset","face_width","worm_pos","worm_spin","thread_span"])
+    assert_approx(struct_val(reused,key),struct_val(auto,key));
+rotated = worm_face_gear_info(40,20,mod=2,gear_diam=d,shaft_offset=e,face_width=w,angle=135,shift=3);
+assert_approx(struct_val(rotated,"worm_pos"),zrot(45,p=struct_val(auto,"worm_pos")+[3,0,0]));
+assert_approx(struct_val(rotated,"mesh_center"),zrot(45,p=struct_val(auto,"mesh_center")));
+assert_approx(struct_val(rotated,"thread_span"),struct_val(auto,"thread_span")-[3,3]);
+// An explicit width overrides the default, and inherits only from a face gear.
+explicit=worm_face_gear_info(40,20,mod=2,shaft_offset=35,face_width=8);
+assert_equal(struct_val(explicit,"face_width"),8);
+'''
+
+[[test]]
+name = "test_worm_face_gear"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+$gear_steps=4;
+mesh = worm_face_gear(40,3,8,mod=2,worm_diam=20,shaft_offset=35,slices=2,search_steps=8);
+assert(is_vnf(mesh));
+assert(len(mesh[0])>0 && len(mesh[1])>0);
+assert(vnf_volume(mesh)>0);
+// Every edge must occur twice, with opposite winding, in the closed VNF.
+nv=len(mesh[0]);
+edges=sort([for(f=mesh[1],i=[0:len(f)-1])
+    let(a=f[i],b=f[(i+1)%len(f)]) 2*(min(a,b)*nv+max(a,b))+(a>b?1:0)]);
+assert(len(edges)%2==0);
+for(i=[0:2:len(edges)-2]) assert_equal(edges[i+1],edges[i]+1);
+bound = worm_face_gear_radius_bound(40,20,mod=2,shaft_offset=35,face_width=8);
+assert_approx(max([for(p=mesh[0]) norm([p.x,p.y])]),bound);
+assert_approx(min(column(mesh[0],2)),-5.5);
+assert(max(column(mesh[0],2))<=2+1e-8);
+left = worm_face_gear(40,3,8,mod=2,worm_diam=20,shaft_offset=35,slices=2,search_steps=8,left_handed=true);
+assert_approx(vnf_volume(left),vnf_volume(mesh));
+assert_approx(left[0],xflip(p=mesh[0]));
+turned = worm_face_gear(40,3,8,mod=2,worm_diam=20,shaft_offset=35,slices=2,search_steps=8,gear_spin=17);
+assert_approx(turned[0],zrot(17,p=mesh[0]));
+'''
+
+[[test]]
+name = "test_worm_face_gear_invalid_sampling_errors"
+expect_success = false
+script = '''
+include <../std.scad>
+include <../gears.scad>
+echo(worm_face_gear(40,mod=2,worm_diam=20,shaft_offset=35,face_width=8,slices=1));
+'''
+
+[[test]]
+name = "test_worm_face_gear_radius_bound"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+info = worm_face_gear_info(40,20,mod=2,shaft_offset=35,face_width=8);
+d = struct_val(info,"gear_diam");
+r = worm_face_gear_radius_bound(40,20,mod=2,shaft_offset=35,face_width=8);
+assert_approx(r,d/2);
+assert_approx(worm_face_gear_radius_bound(40,20,mod=2,shaft_offset=35,gear_diam=d,face_width=8),d/2);
+assert_approx(worm_face_gear_radius_bound(40,mod=2,worm_root_diam=15,shaft_offset=35,face_width=8),r);
+assert_approx(worm_face_gear_radius_bound(40,40,mod=4,shaft_offset=70,face_width=16),2*r);
+'''
+
+[[test]]
+name = "test_worm_face_gear_worm_pos"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+right = worm_face_gear_worm_pos(40,20,mod=2,shaft_offset=35,face_width=8);
+left = worm_face_gear_worm_pos(40,20,mod=2,shaft_offset=35,face_width=8,left_handed=true);
+assert(right.x>0);
+assert_approx([right.y,right.z],[35,10]);
+assert_approx(left,[-right.x,right.y,right.z]);
+assert_approx(worm_face_gear_worm_pos(40,20,mod=2,shaft_offset=35,face_width=8,shift=3),right+[3,0,0]);
+assert_approx(worm_face_gear_worm_pos(40,20,mod=2,shaft_offset=35,face_width=8,shift=3,left_handed=true),left+[3,0,0]);
+assert_approx(worm_face_gear_worm_pos(40,40,mod=4,shaft_offset=70,face_width=16),2*right);
+'''
+
+[[test]]
+name = "test_worm_face_gear_worm_spin"
+script = '''
+include <../std.scad>
+include <../gears.scad>
+
+// Compare modulo one thread period: the helper returns a reduced rotation.
+function phase_error(a,b,period) = let(x=a-b) x-period*round(x/period);
+function phase(lh,s,angle=90,gear_spin=0,shift=0) =
+    worm_face_gear_worm_spin(40,20,mod=2,worm_starts=s,left_handed=lh,
+        pressure_angle=[35,10],face_width=18,
+        angle=angle,gear_spin=gear_spin,shift=shift);
+for(lh=[false,true],s=[1,2]) {
+    q=lh?-1:1;
+    base=phase(lh,s);
+    period=360/s;
+    pitch=2*PI/sqrt(1-pow(s*2/20,2));
+    assert(abs(base)<=period/2+1e-8);
+    assert_approx(phase_error(phase(lh,s,gear_spin=1),base+q*40/s,period),0);
+    assert_approx(phase_error(phase(lh,s,angle=91),base-q*40/s,period),0);
+    assert_approx(phase_error(phase(lh,s,shift=pitch/4),base+q*90/s,period),0);
+    assert_approx(phase_error(phase(lh,s,shift=pitch),base,period),0);
+}
+'''
+
+[[test]]
+name = "test_worm_face_gear_info_invalid_diameter_errors"
+expect_success = false
+script = '''
+include <../std.scad>
+include <../gears.scad>
+echo(worm_face_gear_info(40,20,mod=2,gear_diam=10,face_width=8));
+'''
+
+
+[[test]]
+name = "test_stepped_planetary"
+expect_success = true
+assert_no_echoes = true
+assert_no_warnings = true
+script = '''
+include <../std.scad>
+include <../gears.scad>
+module test_stepped_planetary() {
+    a = stepped_planetary(4,40,mod1=1,sun_carrier=6,exact=true,uniform=true);
+    b = stepped_planetary(4,40,mod1=1,sun_carrier=6,exact=true,uniform=true,gear_spin=120);
+    assert([a[0][1],a[2][1][0],a[2][1][1],a[1][1]]==[8,8,8,40],
+           "\nWrong minimum-diameter exact layout");
+    assert(approx(a[3][1],6), "\nWrong sun/carrier ratio");
+    assert(norm(a[4][1]-[1,0.5])<1e-8, "\nWrong module sizes");
+    assert(norm(a[2][5]-[0,90,180,270])<1e-8, "\nWrong uniform planet angles");
+    assert(approx(b[0][3]-a[0][3],120), "\nWrong sun motion");
+    assert(approx(b[1][3],a[1][3]), "\nFixed ring moved");
+    assert(norm(b[2][5]-a[2][5]-[20,20,20,20])<1e-8, "\nWrong carrier motion");
+    assert(norm(b[2][3]-a[2][3]+[80,80,80,80])<1e-8, "\nWrong planet spin");
+    for(i=[0:3])
+        assert(norm(b[2][4][i]-rot(20,p=a[2][4][i]))<1e-8, "\nWrong planet position");
+    c = stepped_planetary(4,40,mod1=1,sun_carrier=[5.7,6.3],uniform=true);
+    assert(c[3][1]>=5.7 && c[3][1]<=6.3, "\nRatio outside requested interval");
+}
+test_stepped_planetary();
+'''
+
+
+[[test]]
+name = "test_stepped_planetary_conflicting_sizes_errors"
+expect_success = false
+script = '''
+include <../std.scad>
+include <../gears.scad>
+echo(stepped_planetary(3,20,mod=1,mod1=1,sun_carrier=4));
+'''
+
+[[test]]
+name = "test_stepped_planetary_exact_interval_errors"
+expect_success = false
+script = '''
+include <../std.scad>
+include <../gears.scad>
+echo(stepped_planetary(3,20,mod=1,sun_carrier=[3,4],exact=true));
+'''
+
+[[test]]
+name = "test_stepped_planetary_no_feasible_diameter_errors"
+expect_success = false
+script = '''
+include <../std.scad>
+include <../gears.scad>
+echo(stepped_planetary(3,16,mod1=1,sun_carrier=4,max_diam=.1));
+'''
+
+
+[[test]]
+name = "test_wolfrom_planetary"
+expect_success = true
+assert_no_echoes = true
+assert_no_warnings = true
+script = '''
+include <../std.scad>
+include <../gears.scad>
+module test_wolfrom_planetary() {
+    d = [for(u=[0,120]) wolfrom_planetary(3,90,mod1=1,min_teeth=4,
+        sun_ring=-60,exact=true,uniform=true,gear_spin=u)];
+    assert(approx(d[0][3][1],-60), "\nWrong sun/ring ratio");
+    assert(len(d[0][2][4])==3, "\nExpected three planets");
+    assert(approx(d[1][0][3]-d[0][0][3],120), "\nWrong sun motion");
+    assert(norm(d[1][1][3]-d[0][1][3]-[0,-2])<1e-8, "\nWrong ring motion");
+    assert(approx(d[1][5][2]*d[1][5][1],120), "\nWrong carrier motion");
+}
+test_wolfrom_planetary();
+'''
+
+[[test]]
+name = "test_wolfrom_planetary_carrier_intervals"
+expect_success = true
+assert_no_echoes = true
+assert_no_warnings = true
+script = '''
+include <../std.scad>
+include <../gears.scad>
+// Both calls previously emitted undefined-arithmetic warnings.
+a = wolfrom_planetary(3,40,mod1=1,min_teeth=4,uniform=true,sun_carrier=[3.5,4.5]);
+b = wolfrom_planetary(3,40,mod1=1,min_teeth=4,uniform=true,carrier_sun=[1/4.5,1/3.5]);
+assert(a[3][1]>=3.5 && a[3][1]<=4.5, "\nSun/carrier ratio outside interval");
+assert(b[3][1]>=1/4.5 && b[3][1]<=1/3.5, "\nCarrier/sun ratio outside interval");
+'''
+
+[[test]]
+name = "test_gear_motion"
+expect_success = true
+assert_no_echoes = true
+assert_no_warnings = true
+script = '''
+include <../std.scad>
+include <../gears.scad>
+$fn=12; $gear_steps=3;
+module test_gear_motion() {
+    for(u=[-60,0,60]) gear_spin(u)
+        spur_gear2d(mod=1,teeth=24,gear_spin=17)
+            attach_gear(0) spur_gear2d(teeth=48)
+                let(m=gear_motion()) gear_shaft(motion=m)
+                    spur_gear2d(mod=1,teeth=24) {
+                        assert(norm([$gear_rotation,$gear_ratio]-[-u/2,-0.5])<1e-8, "\nCopied motion changed");
+                        assert($gear_input=="rotation" && gear_motion()==m, "\nMotion identity changed");
+                    }
+}
+test_gear_motion();
+'''
+
+[[test]]
+name = "test_gear_shaft"
+expect_success = true
+assert_no_echoes = true
+assert_no_warnings = true
+script = '''
+include <../std.scad>
+include <../gears.scad>
+$fn=12; $gear_steps=3;
+module test_gear_shaft() {
+    gear_spin(60) let(m=gear_motion())
+        gear_shaft() spur_gear2d(mod=1,teeth=24) {
+            assert([$gear_rotation,$gear_ratio]==[0,0], "\nDefault shaft is not fixed");
+            gear_shaft(m) spur_gear2d(mod=1,teeth=24)
+                assert([$gear_rotation,$gear_ratio]==[60,1], "\nInput motion was not restored");
+        }
+}
+test_gear_shaft();
+'''
+
+[[test]]
+name = "test_gear_carrier_frame"
+expect_success = true
+assert_no_echoes = true
+assert_no_warnings = true
+script = '''
+include <../std.scad>
+include <../gears.scad>
+$fn=12; $gear_steps=3;
+module test_gear_carrier_frame() {
+    gear_spin(60) spur_gear2d(mod=1,teeth=24) {
+        gear_carrier_frame(2) {
+            assert(norm([$gear_rotation,$gear_ratio]-[30,0.5])<1e-8, "\nWrong carrier ratio");
+            attach_gear(0) spur_gear2d(teeth=24)
+                assert(norm([$gear_rotation,$gear_ratio])<1e-8, "\nWrong planet motion");
+        }
+        gear_carrier_frame(motion=0)
+            assert([$gear_rotation,$gear_ratio]==[0,0], "\nCarrier should be fixed");
+    }
+}
+test_gear_carrier_frame();
+'''
+
+[[test]]
+name = "test_gear_exit_carrier"
+expect_success = true
+assert_no_echoes = true
+assert_no_warnings = true
+script = '''
+include <../std.scad>
+include <../gears.scad>
+$fn=12; $gear_steps=3;
+module test_gear_exit_carrier() {
+    for(u=[-30,0,30]) gear_spin(u) let(m=gear_motion())
+        gear_shaft() ring_gear2d(mod=1,teeth=72)
+            gear_carrier_frame(motion=m)
+                attach_gear(0) spur_gear2d(teeth=24)
+                    attach_gear(180) spur_gear2d(teeth=24)
+                        gear_exit_carrier()
+                            attach_gear(90) spur_gear2d(teeth=48) {
+                                assert(norm([$gear_rotation,$gear_ratio]-[-2*u,-2])<1e-8, "\nWrong output motion");
+                                assert(norm(apply(zrot($gear_rotation),$gear_chain_locs[0])-[0,-36,0])<1e-8,
+                                       "\nOutput shaft still orbits with carrier");
+                            }
+}
+test_gear_exit_carrier();
+'''
+
+[[test]]
+name = "test_gear_carrier_frame_rejects_numeric_named_motion"
+expect_success = false
+assert_no_echoes = true
+assert_no_warnings = true
+script = '''
+include <../std.scad>
+include <../gears.scad>
+gear_spin(0) spur_gear2d(mod=1,teeth=24) gear_carrier_frame(motion=2);
+'''
+
+[[test]]
+name = "test_globoid_worm_radius_bound"
+expect_success = true
+assert_no_echoes = true
+assert_no_warnings = true
+script = '''
+include <../std.scad>
+include <../gears.scad>
+module test_globoid_worm_radius_bound() {
+    r = globoid_worm_radius_bound(mod=2,teeth=55,d=24,starts=5,length=60);
+    assert(approx(r,19.794968821870803,1e-8), "\nWrong default 32-interval bound");
+    assert(approx(r,globoid_worm_radius_bound(mod=2,55,24,starts=5,l=60,steps=32)), "\nAliases differ");
+    assert(approx(2*r,globoid_worm_radius_bound(mod=4,teeth=55,d=48,starts=5,length=120)), "\nScaling failed");
+    assert(approx(globoid_worm_radius_bound(mod=2,teeth=55,d=24,starts=5,length=60,lead_in=0),
+                  20.25488918556563,1e-8), "\nWrong untapered bound");
+}
+test_globoid_worm_radius_bound();
+'''
