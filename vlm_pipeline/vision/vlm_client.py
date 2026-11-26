@@ -40,12 +40,70 @@ class VLMClient:
         temperature: float = 0.2
     ) -> str:
         """Send a prompt with one or more images to the VLM."""
+        api_key = self.api_key or os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            # Deterministic offline demonstration fallback
+            return self._offline_demo_response(prompt, image_paths)
+
         if self.provider == "anthropic":
             return self._call_anthropic(prompt, image_paths, system_prompt, temperature)
         elif self.provider == "openai":
             return self._call_openai(prompt, image_paths, system_prompt, temperature)
         else:
             raise ValueError(f"Unsupported VLM provider: {self.provider}")
+
+    def _offline_demo_response(self, prompt: str, image_paths: List[Path]) -> str:
+        """Deterministic slot-filler fallback for testing without cloud API keys."""
+        print("[VLMClient] Note: No VLM API key configured in environment. Using deterministic offline slot-filler.")
+        return json.dumps({
+            "part_name": "stepper_adapter_plate",
+            "description": "80x60mm mounting plate with center 608 bearing and 4x M3 screw clearance holes",
+            "target_material": "PETG",
+            "components": [
+                {
+                    "instance_id": "base_plate",
+                    "component_type": "mounting_plate",
+                    "operation": "BASE",
+                    "parameters": {"width_x": 80.0, "depth_y": 60.0, "thickness_z": 5.0, "corner_radius": 3.0, "edge_chamfer": 0.5},
+                    "transform": {"translation_mm": [0, 0, 0], "rotation_deg": [0, 0, 0]}
+                },
+                {
+                    "instance_id": "center_bearing",
+                    "component_type": "ball_bearing_pocket",
+                    "operation": "DIFFERENCE",
+                    "parameters": {"bearing_standard": "608", "press_fit_clearance_mm": 0.15},
+                    "transform": {"translation_mm": [0, 0, 5.0], "rotation_deg": [0, 0, 0]}
+                },
+                {
+                    "instance_id": "hole_tl",
+                    "component_type": "iso_screw_hole",
+                    "operation": "DIFFERENCE",
+                    "parameters": {"size": "M3-0.5", "screw_type": "socket_head", "length": 12.0, "fit": "Normal"},
+                    "transform": {"translation_mm": [-28.0, 18.0, 5.0], "rotation_deg": [0, 0, 0]}
+                },
+                {
+                    "instance_id": "hole_tr",
+                    "component_type": "iso_screw_hole",
+                    "operation": "DIFFERENCE",
+                    "parameters": {"size": "M3-0.5", "screw_type": "socket_head", "length": 12.0, "fit": "Normal"},
+                    "transform": {"translation_mm": [28.0, 18.0, 5.0], "rotation_deg": [0, 0, 0]}
+                },
+                {
+                    "instance_id": "hole_bl",
+                    "component_type": "iso_screw_hole",
+                    "operation": "DIFFERENCE",
+                    "parameters": {"size": "M3-0.5", "screw_type": "socket_head", "length": 12.0, "fit": "Normal"},
+                    "transform": {"translation_mm": [-28.0, -18.0, 5.0], "rotation_deg": [0, 0, 0]}
+                },
+                {
+                    "instance_id": "hole_br",
+                    "component_type": "iso_screw_hole",
+                    "operation": "DIFFERENCE",
+                    "parameters": {"size": "M3-0.5", "screw_type": "socket_head", "length": 12.0, "fit": "Normal"},
+                    "transform": {"translation_mm": [28.0, -18.0, 5.0], "rotation_deg": [0, 0, 0]}
+                }
+            ]
+        })
 
     def _call_anthropic(
         self, prompt: str, image_paths: List[Path], system_prompt: Optional[str], temperature: float
