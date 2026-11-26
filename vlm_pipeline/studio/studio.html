@@ -621,7 +621,7 @@
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                 .STEP
             </a>
-            <button class="btn-print" onclick="dispatchToBambu()">
+            <button class="btn-print" id="btnPrintP1S" onclick="dispatchToBambu()">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
                 Print on P1S
             </button>
@@ -633,22 +633,26 @@
         <div class="viewport-section">
             <div class="viewport-hud">
                 <div class="hud-header">B-Rep Solid Inspection</div>
-                <div class="hud-title" id="hudTitle">stepper_adapter_plate</div>
+                <div class="hud-title" id="hudTitle">No component loaded</div>
                 <div class="hud-stat">
                     <span class="hud-stat-label">Envelope Dimensions</span>
-                    <span class="hud-stat-value" id="hudDims">80.0 × 60.0 × 5.0 mm</span>
+                    <span class="hud-stat-value" id="hudDims">--</span>
                 </div>
                 <div class="hud-stat">
                     <span class="hud-stat-label">Bambu P1S Print Time</span>
-                    <span class="hud-stat-value" id="hudTime">42.0 mins</span>
+                    <span class="hud-stat-value" id="hudTime">--</span>
                 </div>
                 <div class="hud-stat">
                     <span class="hud-stat-label">Filament Weight</span>
-                    <span class="hud-stat-value" id="hudWeight">18.5 g (PETG)</span>
+                    <span class="hud-stat-value" id="hudWeight">--</span>
+                </div>
+                <div class="hud-stat">
+                    <span class="hud-stat-label">Slicer Engine</span>
+                    <span class="hud-stat-value" id="hudSlicer" style="color: #4ade80;">OrcaSlicer (Real G-code)</span>
                 </div>
                 <div class="hud-stat">
                     <span class="hud-stat-label">Watertight Boundary</span>
-                    <span class="hud-stat-value" style="color: #4ade80;">100% Manifold</span>
+                    <span class="hud-stat-value" id="hudManifold" style="color: #4ade80;">100% Manifold</span>
                 </div>
             </div>
 
@@ -1032,8 +1036,22 @@
                 if (data.status === "success") {
                     appendBubble("assistant", data.reply);
                     document.getElementById("hudTitle").innerText = data.telemetry.part_name;
-                    document.getElementById("hudTime").innerText = `${data.telemetry.estimated_time_minutes.toFixed(1)} mins`;
-                    document.getElementById("hudWeight").innerText = `${data.telemetry.filament_used_grams.toFixed(1)} g`;
+
+                    if (data.has_sliced_3mf) {
+                        document.getElementById("hudSlicer").innerText = "OrcaSlicer (Real 3MF)";
+                        document.getElementById("hudSlicer").style.color = "#4ade80";
+                        document.getElementById("hudTime").innerText = `${data.telemetry.estimated_time_minutes.toFixed(1)} mins`;
+                        document.getElementById("hudWeight").innerText = `${data.telemetry.filament_used_grams.toFixed(1)} g (${data.plan.target_material || 'PLA'})`;
+                        document.getElementById("btnPrintP1S").disabled = false;
+                        document.getElementById("btnPrintP1S").style.opacity = "1";
+                    } else {
+                        document.getElementById("hudSlicer").innerText = "❌ Slicer Missing";
+                        document.getElementById("hudSlicer").style.color = "#ef4444";
+                        document.getElementById("hudTime").innerText = "Not Sliced";
+                        document.getElementById("hudWeight").innerText = "--";
+                        document.getElementById("btnPrintP1S").disabled = true;
+                        document.getElementById("btnPrintP1S").style.opacity = "0.4";
+                    }
 
                     // Update 3D viewport
                     loadSTL('/api/model.stl');

@@ -1,22 +1,58 @@
-"""Headless Slicer interface targeting OrcaSlicer or Bambu Studio CLI."""
+"""Headless Slicer interface targeting OrcaSlicer or Bambu Studio CLI.
 
+Translates solid 3D geometries (STL/STEP) into machine-specific toolpaths
+(.gcode.3mf) calibrated for the Bambu Lab P1S/X1/A1.
+"""
+
+import os
 import re
+import shutil
 import subprocess
+import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any, Tuple
 
 from vlm_pipeline.models.spec import SlicerResult
 from vlm_pipeline.config import config
+
+
+PROFILES_DIR = Path(__file__).parent.parent / "resources" / "profiles"
+
+
+class SlicerNotFoundError(RuntimeError):
+    """Raised when no slicing engine binary (orca-slicer or bambu-studio) is found in PATH."""
+    pass
 
 
 class HeadlessSlicer:
     """Invokes OrcaSlicer or Bambu Studio headlessly to slice models for the P1S."""
 
     def __init__(self, slicer_bin: Optional[str] = None):
-        self.slicer_bin = slicer_bin or config.slicer_bin
+        self.slicer_bin = slicer_bin or self._find_slicer_binary()
+
+    @classmethod
+    def _find_slicer_binary(cls) -> str:
+        """Locates available slicer binary in PATH or standard local bin locations."""
+        custom = os.getenv("ORCA_SLICER_BIN") or os.getenv("BAMBU_STUDIO_BIN")
+        if custom and shutil.which(custom):
+            return custom
+
+        candidates = [
+            shutil.which("orca-slicer"),
+            shutil.which("bambu-studio"),
+            shutil.which("prusa-slicer"),
+            str(Path.home() / ".local" / "bin" / "orca-slicer"),
+            str(Path.home() / ".local" / "bin" / "bambu-studio")
+        ]
+        for c in candidates:
+            if c and Path(c).is_file() and os.access(c, os.X_OK):
+                return str(c)
+
+        return config.slicer_bin or "orca-slicer"
 
     def is_available(self) -> bool:
-        """Check if slicer CLI is installed."""
+        """Check if a real slicing CLI is installed and operational."""
         try:
             res = subprocess.run([self.slicer_bin, "--help"], capture_output=True, text=True, timeout=5)
             return res.returncode in [0, 1]
@@ -27,51 +63,72 @@ class HeadlessSlicer:
         self,
         input_model_path: Path,
         output_dir: Path,
-        filament: str = "Bambu PLA Basic",
+        filament_type: str = "PLA",
         layer_height: float = 0.20,
         enable_tree_supports: bool = True
     ) -> SlicerResult:
         """
-        Runs headless slicing on the target STL, producing a sliced .gcode.3mf
-        ready for the Bambu P1S.
+        Runs headless slicing on the target STL using Bambu P1S profiles,
+        producing a genuine sliced .gcode.3mf ready for execution.
         """
         output_dir.mkdir(parents=True, exist_ok=True)
         output_3mf = output_dir / f"{input_model_path.stem}.gcode.3mf"
 
         if not self.is_available():
-            # Return simulated success result when slicer binary is not in PATH
-            return SlicerResult(
-                success=True,
-                output_3mf_path=str(input_model_path),  # Fallback to STL
-                estimated_time_minutes=42.0,
-                filament_used_grams=18.5,
-                layer_count=int(25.0 / layer_height),
-                raw_slicer_output="Slicer CLI not installed. Simulation mode active."
+            error_msg = (
+                f"Slicer CLI ('{self.slicer_bin}') is NOT installed or found in PATH.\n"
+                "A 3D printer cannot print an un-sliced STL file directly.\n"
+                "Please run 'vlm-print setup-slicer' to automatically download and configure OrcaSlicer, "
+                "or set ORCA_SLICER_BIN to your local slicer binary."
             )
+            return SlicerResult(
+                success=False,
+                output_3mf_path=None,
+                estimated_time_minutes=0.0,
+                filament_used_grams=0.0,
+                layer_count=0,
+                raw_slicer_output=error_msg
+            )
+
+        machine_profile = PROFILES_DIR / "machine" / "Bambu Lab P1S 0.4 nozzle.json"
+        process_profile = PROFILES_DIR / "process" / "0.20mm Standard @BBL X1C.json"
+        filament_profile = (
+            PROFILES_DIR / "filament" / "Bambu PETG Basic @BBL X1C.json"
+            if "petg" in filament_type.lower()
+            else PROFILES_DIR / "filament" / "Bambu PLA Basic @BBL X1C.json"
+        )
+
+        load_settings = f"{machine_profile};{process_profile}"
 
         cmd = [
             self.slicer_bin,
+            "--load-settings", load_settings,
+            "--load-filaments", str(filament_profile),
             "--slice", "0",
-            "--export-3mf", str(output_3mf),
-            "--layer-height", str(layer_height),
-            "--infill-density", f"{config.print_quality.infill_percentage}%",
-            "--infill-pattern", config.print_quality.infill_pattern,
-            str(input_model_path)
+            "--outputdir", str(output_dir),
+            "--export-3mf", output_3mf.name,
+            str(input_model_path.resolve())
         ]
-
-        if enable_tree_supports:
-            cmd.extend(["--support-type", "tree", "--enable-support", "1"])
 
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             stdout = proc.stdout + proc.stderr
 
-            time_min = self._extract_print_time(stdout)
-            grams = self._extract_filament_grams(stdout)
+            if not output_3mf.exists():
+                return SlicerResult(
+                    success=False,
+                    output_3mf_path=None,
+                    estimated_time_minutes=0.0,
+                    filament_used_grams=0.0,
+                    raw_slicer_output=stdout
+                )
+
+            # Parse true metadata from generated 3MF archive
+            time_min, grams = self._parse_slice_info_metadata(output_3mf)
 
             return SlicerResult(
-                success=output_3mf.exists(),
-                output_3mf_path=str(output_3mf) if output_3mf.exists() else None,
+                success=True,
+                output_3mf_path=str(output_3mf),
                 estimated_time_minutes=time_min,
                 filament_used_grams=grams,
                 raw_slicer_output=stdout
@@ -79,23 +136,35 @@ class HeadlessSlicer:
         except Exception as e:
             return SlicerResult(
                 success=False,
-                raw_slicer_output=f"Slicing failed: {str(e)}"
+                output_3mf_path=None,
+                estimated_time_minutes=0.0,
+                filament_used_grams=0.0,
+                raw_slicer_output=f"Headless slicing execution failed: {str(e)}"
             )
 
-    def _extract_print_time(self, output: str) -> float:
-        """Extract estimated print time in minutes from slicer logs."""
-        # Match patterns like: "Estimated printing time: 1h 24m" or "Total time: 45m"
-        match_h_m = re.search(r"(\d+)h\s*(\d+)m", output)
-        if match_h_m:
-            return float(match_h_m.group(1)) * 60 + float(match_h_m.group(2))
-        match_m = re.search(r"(\d+)m\s*(\d+)s", output)
-        if match_m:
-            return float(match_m.group(1)) + float(match_m.group(2)) / 60.0
-        return 0.0
+    @classmethod
+    def _parse_slice_info_metadata(cls, archive_3mf: Path) -> Tuple[float, float]:
+        """Extracts exact print time in minutes and filament in grams from Bambu 3MF metadata."""
+        time_min = 0.0
+        grams = 0.0
+        try:
+            with zipfile.ZipFile(archive_3mf, "r") as zf:
+                if "Metadata/slice_info.config" in zf.namelist():
+                    with zf.open("Metadata/slice_info.config") as f:
+                        root = ET.fromstring(f.read())
+                        pred = root.find('.//metadata[@key="prediction"]')
+                        if pred is not None and pred.attrib.get("value"):
+                            time_min = round(float(pred.attrib["value"]) / 60.0, 1)
 
-    def _extract_filament_grams(self, output: str) -> float:
-        """Extract filament weight in grams from slicer logs."""
-        match = re.search(r"([\d\.]+)\s*g", output)
-        if match:
-            return float(match.group(1))
-        return 0.0
+                        fil = root.find(".//filament")
+                        if fil is not None:
+                            used_g = float(fil.attrib.get("used_g", 0.0))
+                            used_m = float(fil.attrib.get("used_m", 0.0))
+                            # 1.75mm PLA is ~3.0g/m, PETG ~3.1g/m
+                            if used_g > 0:
+                                grams = round(used_g, 1)
+                            elif used_m > 0:
+                                grams = round(used_m * 3.0, 1)
+        except Exception:
+            pass
+        return time_min, grams

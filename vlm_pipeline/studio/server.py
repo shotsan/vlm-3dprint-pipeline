@@ -227,14 +227,15 @@ Current AssemblyPlan:
     # 3. Printability Audit
     audit = FallbackMeshEngine.audit_stl(state.stl_path)
 
-    # 4. Slicing
+    # 4. Real Headless Slicing via OrcaSlicer / Bambu Studio CLI
     slice_res = slicer.slice_to_3mf(
         input_model_path=state.stl_path,
         output_dir=SESSION_DIR / "sliced",
+        filament_type=state.assembly_plan.target_material,
         layer_height=config.print_quality.layer_height_mm,
         enable_tree_supports=config.print_quality.enable_tree_supports
     )
-    state.sliced_3mf_path = Path(slice_res.output_3mf_path) if slice_res.output_3mf_path else None
+    state.sliced_3mf_path = Path(slice_res.output_3mf_path) if (slice_res.success and slice_res.output_3mf_path) else None
 
     # Telemetry
     state.telemetry = {
@@ -242,11 +243,16 @@ Current AssemblyPlan:
         "is_watertight": audit.is_watertight,
         "non_manifold_edges": audit.non_manifold_edges,
         "overhang_faces": audit.overhang_faces_exceeding_threshold,
+        "is_sliced": slice_res.success,
+        "slicer_status": "Ready (OrcaSlicer 3MF)" if slice_res.success else "Slicer Missing / Failed",
         "estimated_time_minutes": slice_res.estimated_time_minutes,
         "filament_used_grams": slice_res.filament_used_grams,
         "step_size_bytes": state.step_path.stat().st_size if state.step_path else 0,
         "stl_size_bytes": state.stl_path.stat().st_size if state.stl_path else 0,
     }
+
+    if not slice_res.success:
+        assistant_reply += "\n\n⚠️ **Slicer Warning**: OrcaSlicer CLI is not detected or slicing failed. A real 3MF toolpath could not be generated. Please run `vlm-print setup-slicer` on your machine."
 
     state.chat_history.append({"role": "assistant", "content": assistant_reply})
 
@@ -255,7 +261,8 @@ Current AssemblyPlan:
         "reply": assistant_reply,
         "plan": state.assembly_plan.model_dump(),
         "telemetry": state.telemetry,
-        "stl_url": "/api/model.stl"
+        "stl_url": "/api/model.stl",
+        "has_sliced_3mf": bool(state.sliced_3mf_path and state.sliced_3mf_path.exists())
     }
 
 
@@ -279,15 +286,16 @@ async def download_step():
 async def trigger_print():
     """Dispatches the sliced 3MF project over local LAN to the Bambu Lab P1S."""
     if not state.sliced_3mf_path or not state.sliced_3mf_path.exists():
-        # Fallback to STL if 3MF not generated
-        target = state.stl_path
-    else:
-        target = state.sliced_3mf_path
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Cannot dispatch: Model has not been sliced into G-code toolpaths. "
+                "A 3D printer cannot execute raw STL triangles. "
+                "Please run 'vlm-print setup-slicer' to install OrcaSlicer CLI."
+            )
+        )
 
-    if not target or not target.exists():
-        raise HTTPException(status_code=400, detail="No model available to print.")
-
-    res = bambu.print_model(target, auto_start=True)
+    res = bambu.print_model(state.sliced_3mf_path, auto_start=True)
     return res
 
 

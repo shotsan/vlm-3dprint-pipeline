@@ -48,6 +48,9 @@ def main():
     studio_parser = subparsers.add_parser("studio", help="Launch Interactive Multimodal Web Studio with Chat & Image Input")
     studio_parser.add_argument("--port", type=int, default=8000, help="Web studio port (default 8000)")
 
+    # Command: setup-slicer
+    subparsers.add_parser("setup-slicer", help="Automatically install and configure OrcaSlicer AppImage for Linux")
+
     args = parser.parse_args()
 
     if args.command == "run":
@@ -121,6 +124,23 @@ def main():
     elif args.command == "studio":
         from vlm_pipeline.studio.server import start_studio_server
         start_studio_server(port=args.port)
+
+    elif args.command == "setup-slicer":
+        import urllib.request
+        from vlm_pipeline.slicer.orca_slicer import HeadlessSlicer
+        slicer = HeadlessSlicer()
+        if slicer.is_available():
+            print(f"✅ Slicer is already installed and functional at: {slicer.slicer_bin}")
+            sys.exit(0)
+
+        target_bin = Path.home() / ".local" / "bin" / "orca-slicer"
+        target_bin.parent.mkdir(parents=True, exist_ok=True)
+        url = "https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v2.2.0/OrcaSlicer_Linux_V2.2.0.AppImage"
+        print(f"📥 Downloading OrcaSlicer AppImage from:\n   {url}")
+        print(f"   Target destination: {target_bin}")
+        urllib.request.urlretrieve(url, target_bin)
+        target_bin.chmod(0o755)
+        print("✅ OrcaSlicer successfully installed and configured!")
 
 
 if __name__ == "__main__":
