@@ -44,6 +44,10 @@ def main():
     # Command: serve (MCP)
     serve_parser = subparsers.add_parser("serve", help="Run as an MCP (Model Context Protocol) server")
 
+    # Command: studio / ui
+    studio_parser = subparsers.add_parser("studio", help="Launch Interactive Multimodal Web Studio with Chat & Image Input")
+    studio_parser.add_argument("--port", type=int, default=8000, help="Web studio port (default 8000)")
+
     args = parser.parse_args()
 
     if args.command == "run":
@@ -113,6 +117,10 @@ def main():
     elif args.command == "serve":
         from vlm_pipeline.mcp_server import start_mcp_server
         start_mcp_server()
+
+    elif args.command == "studio":
+        from vlm_pipeline.studio.server import start_studio_server
+        start_studio_server(port=args.port)
 
 
 if __name__ == "__main__":
