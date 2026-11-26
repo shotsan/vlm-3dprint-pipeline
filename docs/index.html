@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VLM 3D Print Pipeline — Deterministic Multimodal CAD to Additive Manufacturing</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #090b10;
+            --bg-surface: #10141d;
+            --bg-elevated: #161b26;
+            --bg-card: #1c2230;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-medium: rgba(255, 255, 255, 0.16);
+            --accent-green: #22c55e;
+            --accent-blue: #38bdf8;
+            --accent-amber: #f59e0b;
+            --accent-purple: #a855f7;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; scroll-behavior: smooth; }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Top Header */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 60px;
+            background: rgba(9, 11, 16, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: #fff;
+        }
+
+        .brand-logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent-green) 0%, #059669 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+        }
+
+        .brand-logo svg { width: 18px; height: 18px; fill: #000; }
+        .brand-name { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+        .brand-tag {
+            font-size: 11px;
+            font-family: var(--font-mono);
+            background: rgba(56, 189, 248, 0.12);
+            color: var(--accent-blue);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+
+        .header-links {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13.5px;
+            font-weight: 500;
+            transition: color 0.15s;
+        }
+        .header-links a:hover { color: #fff; }
+
+        .btn-github {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-subtle);
+            padding: 6px 14px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff !important;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .btn-github:hover {
+            background: rgba(255, 255, 255, 0.14);
+            border-color: var(--border-medium);
+        }
+
+        /* Layout Container */
+        .docs-container {
+            max-width: 1380px;
+            margin: 0 auto;
+            display: flex;
+            min-height: calc(100vh - 60px);
+        }
+
+        /* Sidebar Navigation */
+        aside.docs-sidebar {
+            width: 280px;
+            position: sticky;
+            top: 60px;
+            height: calc(100vh - 60px);
+            overflow-y: auto;
+            padding: 28px 20px 40px 16px;
+            border-right: 1px solid var(--border-subtle);
+            flex-shrink: 0;
+        }
+
+        .nav-group { margin-bottom: 24px; }
+        .nav-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            padding-left: 10px;
+        }
+
+        .nav-list { list-style: none; }
+        .nav-item a {
+            display: block;
+            padding: 6px 12px;
+            font-size: 13.5px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.15s;
+        }
+        .nav-item a:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        /* Main Content */
+        main.docs-content {
+            flex: 1;
+            padding: 40px 60px 100px 60px;
+            max-width: 960px;
+        }
+
+        /* Hero Header */
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.25);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent-green);
+            margin-bottom: 16px;
+        }
+
+        h1.hero-title {
+            font-size: 40px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            line-height: 1.15;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.hero-desc {
+            font-size: 17px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        /* Quick CTA Buttons */
+        .cta-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 48px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-green) 0%, #16a34a 100%);
+            color: #000;
+            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 16px rgba(34, 197, 94, 0.3);
+            transition: all 0.2s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(34, 197, 94, 0.45);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            color: #fff;
+            font-weight: 500;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--border-medium);
+        }
+
+        /* Typography & Section Styles */
+        h2.section-title {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin: 48px 0 16px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-subtle);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h3.subsection-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 28px 0 12px 0;
+            color: #f1f5f9;
+        }
+
+        p { margin-bottom: 16px; color: #cbd5e1; font-size: 15px; }
+
+        /* Code Blocks */
+        pre {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 16px 20px;
+            overflow-x: auto;
+            margin: 16px 0 24px 0;
+        }
+
+        code {
+            font-family: var(--font-mono);
+            font-size: 13.5px;
+            color: #38bdf8;
+        }
+
+        p code, li code {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12.5px;
+            color: #e2e8f0;
+        }
+
+        /* Callout Alert Cards */
+        .callout {
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin: 20px 0;
+            display: flex;
+            gap: 14px;
+        }
+        .callout.info {
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+        }
+        .callout.tip {
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.25);
+        }
+        .callout.warning {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+        .callout-icon { font-size: 18px; line-height: 1.4; }
+        .callout-content { font-size: 14px; color: #cbd5e1; }
+        .callout-content strong { color: #fff; }
+
+        /* Cards Grid */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+        .card:hover {
+            border-color: var(--border-medium);
+            transform: translateY(-2px);
+        }
+        .card-icon {
+            font-size: 24px;
+            margin-bottom: 12px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .card-desc {
+            font-size: 13.5px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 13.5px;
+        }
+        th, td {
+            text-align: left;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        th {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        td { color: var(--text-secondary); }
+
+        /* Architecture Diagram Flow */
+        .pipeline-flow {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 16px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+        }
+        .flow-step-num {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+            font-weight: 700;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .flow-step-text strong { color: #fff; font-size: 14px; display: block; margin-bottom: 2px; }
+        .flow-step-text span { color: var(--text-secondary); font-size: 12.5px; }
+
+        footer {
+            margin-top: 80px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-subtle);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="#" class="header-brand">
+            <div class="brand-logo">
+                <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <div class="brand-name">VLM 3D Print Pipeline</div>
+            <div class="brand-tag">v0.1.0 • MIT</div>
+        </a>
+        <div class="header-links">
+            <a href="#quickstart">Quickstart</a>
+            <a href="#architecture">Architecture</a>
+            <a href="#catalog">Component Catalog</a>
+            <a href="#slicer">OrcaSlicer</a>
+            <a href="#bambu">Bambu P1S LAN</a>
+            <a href="https://github.com/shotsan/vlm-3dprint-pipeline" target="_blank" class="btn-github">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                GitHub
+            </a>
+        </div>
+    </header>
+
+    <div class="docs-container">
+        <!-- Sidebar Navigation -->
+        <aside class="docs-sidebar">
+            <div class="nav-group">
+                <div class="nav-title">Overview</div>
+                <ul class="nav-list">
+                    <li class="nav-item"><a href="#introduction">Introduction</a></li>
+                    <li class="nav-item"><a href="#philosophy">Core Philosophy</a></li>
+                    <li class="nav-item"><a href="#quickstart">Quickstart Installation</a></li>
+                </ul>
+            </div>
+            <div class="nav-group">
+                <div class="nav-title">Architecture</div>
+                <ul class="nav-list">
+                    <li class="nav-item"><a href="#architecture">5-Gate Pipeline</a></li>
+                    <li class="nav-item"><a href="#slot-filling">Parametric Slot-Filling</a></li>
+                    <li class="nav-item"><a href="#cad-kernel">OpenCASCADE B-Rep Solids</a></li>
+                </ul>
+            </div>
+            <div class="nav-group">
+                <div class="nav-title">Tooling & Manufacturing</div>
+                <ul class="nav-list">
+                    <li class="nav-item"><a href="#catalog">Component Catalog (105+)</a></li>
+                    <li class="nav-item"><a href="#slicer">OrcaSlicer Automation</a></li>
+                    <li class="nav-item"><a href="#bambu">Bambu P1S LAN Controller</a></li>
+                </ul>
+            </div>
+            <div class="nav-group">
+                <div class="nav-title">Interfaces</div>
+                <ul class="nav-list">
+                    <li class="nav-item"><a href="#web-studio">Interactive Web Studio</a></li>
+                    <li class="nav-item"><a href="#cli-ref">CLI Commands</a></li>
+                    <li class="nav-item"><a href="#mcp-server">FastMCP Protocol</a></li>
+                    <li class="nav-item"><a href="#license">License</a></li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Documentation Content -->
+        <main class="docs-content">
+            
+            <div class="hero-badge">Autonomous Physical AI • Zero-Cloud LAN Mode</div>
+            <h1 class="hero-title">Deterministic VLM-to-3D-Print Pipeline</h1>
+            <p class="hero-desc">
+                An industrial manufacturing pipeline that transforms 2D technical sketches, diagrams, and photos into verified, 100% watertight 2-manifold B-Rep solids, slices them headlessly via OrcaSlicer, and dispatches them over local LAN directly to Bambu Lab 3D printers.
+            </p>
+
+            <div class="cta-row">
+                <a href="#quickstart" class="btn-primary">⚡ Quickstart Guide</a>
+                <a href="#web-studio" class="btn-secondary">🖥️ Launch Web Studio</a>
+            </div>
+
+            <!-- SECTION: Introduction -->
+            <section id="introduction">
+                <h2 class="section-title">Introduction</h2>
+                <p>
+                    Standard generative 3D approaches (SDFs, NeRFs, triplane diffusion, and raw free-form LLM code generation) produce meshes full of non-manifold edges, inverted normals, floating artifacts, and unprintable thin walls. A 3D printer mainboard cannot slice visual illusions—it requires mathematically exact boundary representation (B-Rep) solids that strictly adhere to FDM additive manufacturing constraints.
+                </p>
+                <p>
+                    <strong>VLM 3D Print Pipeline</strong> bridges high-level visual understanding with rigorous mechanical engineering. Instead of asking Vision-Language Models to hallucinate raw geometry, it constrains the VLM to act as a <em>CAD Slot-Filler</em> that selects pre-validated engineering building blocks from an exhaustive catalog (fasteners, bearings, motor mounts, spur gears, brackets, and aerodynamic airframes) parameterized by real-world millimeters.
+                </p>
+            </section>
+
+            <!-- SECTION: Philosophy -->
+            <section id="philosophy">
+                <h2 class="section-title">Core Philosophy & Invariants</h2>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-icon">🛡️</div>
+                        <div class="card-title">Deterministic AST Slot-Filling</div>
+                        <p class="card-desc">VLMs never write unstructured code. They emit strictly typed <code>AssemblyPlan</code> abstract syntax trees validated against physical Pydantic schemas.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">📐</div>
+                        <div class="card-title">Exact Mathematical Solids</div>
+                        <p class="card-desc">Powered by OpenCASCADE, <code>build123d</code>, and <code>bd_warehouse</code> to produce true STEP solids with calibrated press-fit and fastener clearances.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">⚙️</div>
+                        <div class="card-title">Real Headless Slicing</div>
+                        <p class="card-desc">Direct OrcaSlicer CLI integration generating legitimate <code>.gcode.3mf</code> archives with tree supports, gyroid infill, and plate metadata.</p>
+                    </div>
+                    <div class="card">
+                        <div class="card-icon">🔒</div>
+                        <div class="card-title">Zero-Cloud Bambu LAN Mode</div>
+                        <p class="card-desc">Bypasses proprietary cloud dependencies entirely. Communicates with Bambu Lab P1S/X1/A1 printers via local FTPS (port 990) and MQTT TLS (port 8883).</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: Quickstart -->
+            <section id="quickstart">
+                <h2 class="section-title">Quickstart Installation</h2>
+
+                <p>Install the pipeline and its solid modeling dependencies in a Python 3.10+ environment:</p>
+
+                <pre><code># 1. Clone repository
+git clone https://github.com/shotsan/vlm-3dprint-pipeline.git
+cd vlm-3dprint-pipeline
+
+# 2. Install Python package in editable mode
+pip install -e .
+
+# 3. Setup OrcaSlicer headless CLI engine (one-click installer)
+vlm-print setup-slicer</code></pre>
+
+                <div class="callout tip">
+                    <div class="callout-icon">💡</div>
+                    <div class="callout-content">
+                        <strong>Automatic Slicer Setup:</strong> Running <code>vlm-print setup-slicer</code> downloads the official headless Linux AppImage to <code>~/.local/bin/orca-slicer</code> and configures built-in Bambu Lab P1S profiles automatically.
+                    </div>
+                </div>
+
+                <h3 class="subsection-title">Launch the Interactive Web Studio</h3>
+                <p>Start the local real-time 3D inspection studio with side-by-side conversational chat:</p>
+                <pre><code>vlm-print studio --port 8000</code></pre>
+                <p>Navigate your browser to <a href="http://127.0.0.1:8000" target="_blank"><code>http://127.0.0.1:8000</code></a>.</p>
+            </section>
+
+            <!-- SECTION: Architecture -->
+            <section id="architecture">
+                <h2 class="section-title">5-Gate Pipeline Architecture</h2>
+
+                <div class="pipeline-flow">
+                    <div class="flow-step">
+                        <div class="flow-step-num">1</div>
+                        <div class="flow-step-text">
+                            <strong>Multimodal Slot-Filling</strong>
+                            <span>Visual input is parsed by Gemini 2.0 Flash / Claude 3.5 Sonnet or the local Parametric NLP engine into an <code>AssemblyPlan</code> AST.</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-num">2</div>
+                        <div class="flow-step-text">
+                            <strong>Physical Boundary Contract Gatekeeper</strong>
+                            <span>Pydantic enforces Bambu P1S bed bounds (256x256x256mm), minimum wall thickness (≥ 1.2mm for 0.4mm nozzle), and standard fits.</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-num">3</div>
+                        <div class="flow-step-text">
+                            <strong>OpenCASCADE B-Rep Solid Compilation</strong>
+                            <span><code>build123d</code> and <code>bd_warehouse</code> compile exact solids, export STEP geometries, and tessellate 2-manifold STL meshes.</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-num">4</div>
+                        <div class="flow-step-text">
+                            <strong>DFM Printability Audit & Real Headless Slicing</strong>
+                            <span>Verifies watertight manifoldness and overhang angles. OrcaSlicer headlessly slices toolpaths, generating true G-code and time/filament predictions.</span>
+                        </div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-step-num">5</div>
+                        <div class="flow-step-text">
+                            <strong>Zero-Cloud Local LAN Dispatch</strong>
+                            <span>Uploads the <code>.gcode.3mf</code> archive over FTPS (port 990) and initiates printing via local MQTT (port 8883) with real-time telemetry streaming.</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: Component Catalog -->
+            <section id="catalog">
+                <h2 class="section-title">Exhaustive Component Catalog</h2>
+                <p>
+                    The catalog encompasses 105+ verified mechanical standards across 8 engineering disciplines:
+                </p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Standards Covered</th>
+                            <th>Key Parameters</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Fasteners</strong></td>
+                            <td>ISO 4762 (Socket Head), ISO 7380 (Button Head), ISO 10642 (Countersunk), DIN 933 (Hex Bolt), Ruthex Heat-Set Inserts, DIN 934 Nut Traps</td>
+                            <td><code>size (M2-M8)</code>, <code>length</code>, <code>fit (Close/Normal/Loose)</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Bearings</strong></td>
+                            <td>ISO 15 Deep Groove (608, 624, 625, 688, 6000, 6001), Flanged, Press-fit Cavities</td>
+                            <td><code>bearing_standard</code>, <code>press_fit_clearance_mm</code>, <code>shaft_clearance_mm</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Gearing</strong></td>
+                            <td>Involute Spur Gears, Helical Gears, GT2 Timing Pulleys (2mm pitch), Roller Chain Sprockets</td>
+                            <td><code>teeth_count</code>, <code>module</code>, <code>face_width</code>, <code>bore_dia</code>, <code>d_flat_depth</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Motors</strong></td>
+                            <td>NEMA 08, 11, 14, 17, 23, 34 Stepper Faceplates, Spindle Clamps</td>
+                            <td><code>nema_size</code>, <code>slotted_holes</code>, <code>slot_travel_mm</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Structural</strong></td>
+                            <td>Corner L-Brackets with Triangular Gussets, Mounting Plates, Electronics Enclosure Shells</td>
+                            <td><code>leg_length</code>, <code>bracket_width</code>, <code>wall_thickness</code>, <code>corner_radius</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Aerodynamics</strong></td>
+                            <td>Printable Aerodynamic Gliders & Toy Airplanes (Fuselage, Swept Wings, Stabilizers, Axle Mount)</td>
+                            <td><code>fuselage_length</code>, <code>wingspan</code>, <code>wing_thickness</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>DFM Utilities</strong></td>
+                            <td>45° Teardrop Horizontal Self-Supporting Bores, Hexagonal Honeycomb Vent Grills</td>
+                            <td><code>diameter</code>, <code>length</code>, <code>hex_width</code>, <code>strut_thickness</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- SECTION: OrcaSlicer -->
+            <section id="slicer">
+                <h2 class="section-title">OrcaSlicer & Bambu Studio Headless Engine</h2>
+                <p>
+                    Rather than relying on simulated estimates or un-sliceable STLs, the pipeline executes real toolpath generation via OrcaSlicer CLI. The engine loads calibrated JSON configuration profiles:
+                </p>
+
+                <pre><code># Automatic headless slicing executed by the pipeline
+orca-slicer \
+  --load-settings "resources/profiles/machine/Bambu Lab P1S 0.4 nozzle.json;resources/profiles/process/0.20mm Standard @BBL X1C.json" \
+  --load-filaments "resources/profiles/filament/Bambu PLA Basic @BBL X1C.json" \
+  --slice 0 \
+  --outputdir ./sliced/ \
+  --export-3mf model.gcode.3mf \
+  ./cad/model.stl</code></pre>
+
+                <p>
+                    The generated <code>.gcode.3mf</code> is an uncompressed ZIP containing <code>Metadata/slice_info.config</code>. The pipeline extracts exact execution predictions directly from the G-code toolpath stream:
+                </p>
+                <pre><code><!-- Extracted metadata from real slicing engine -->
+&lt;config&gt;
+  &lt;plate&gt;
+    &lt;metadata key="prediction" value="2712" /&gt;  &lt;!-- 45.2 minutes --&gt;
+    &lt;filament used_m="2.47" used_g="7.4" /&gt;   &lt;!-- 7.4 grams PLA --&gt;
+  &lt;/plate&gt;
+&lt;/config&gt;</code></pre>
+            </section>
+
+            <!-- SECTION: Bambu LAN Mode -->
+            <section id="bambu">
+                <h2 class="section-title">Zero-Cloud Bambu Lab P1S LAN Communication</h2>
+                <p>
+                    Bambu Lab printers feature an onboard "LAN Only Mode" that enables local control without external internet access or third-party cloud brokers:
+                </p>
+
+                <pre><code># Set environment variables for local Bambu P1S / X1C / A1
+export BAMBU_IP="192.168.1.150"
+export BAMBU_SERIAL="01P00A000000000"
+export BAMBU_ACCESS_CODE="12345678"  # 8-digit passcode from printer LCD screen
+
+# Query live status over LAN MQTT TLS (port 8883)
+vlm-print status</code></pre>
+
+                <div class="callout warning">
+                    <div class="callout-icon">⚠️</div>
+                    <div class="callout-content">
+                        <strong>Security & Privacy:</strong> Operating in LAN Mode prevents printer telemetry, print files, and camera streams from being uploaded to external cloud servers.
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: Web Studio -->
+            <section id="web-studio">
+                <h2 class="section-title">Interactive Multimodal Web Studio</h2>
+                <p>
+                    The Web Studio provides a real-time, right-hand-optimized workstation designed for iterative mechanical design:
+                </p>
+                <ul>
+                    <li><strong>Left 3D Viewport:</strong> Interactive Three.js WebGL solid visualizer with orbit controls, 256x256mm build plate grid, wireframe toggle, and a custom GLSL <strong>Overhang Heatmap Shader</strong> highlighting faces &gt; 45° in real time.</li>
+                    <li><strong>Right Conversational Pane:</strong> Modern chat interface with multiline input capsule, drag-and-drop sketch/image attachment, prompt pill suggestions, and live physical manifold badges.</li>
+                    <li><strong>Engine Settings Modal:</strong> Switch on the fly between the <strong>Offline Parametric CAD Engine</strong> (zero keys needed), <strong>Google Gemini 2.0 Flash</strong>, <strong>Anthropic Claude 3.5 Sonnet</strong>, or <strong>OpenAI GPT-4o</strong>.</li>
+                </ul>
+            </section>
+
+            <!-- SECTION: CLI Reference -->
+            <section id="cli-ref">
+                <h2 class="section-title">CLI Reference</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Command</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>vlm-print studio [--port 8000]</code></td>
+                            <td>Launches the local interactive Web Studio with Three.js solid inspection and multimodal iteration chat.</td>
+                        </tr>
+                        <tr>
+                            <td><code>vlm-print setup-slicer</code></td>
+                            <td>Downloads and configures the official OrcaSlicer headless AppImage in <code>~/.local/bin/</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><code>vlm-print run &lt;image&gt; [--guidance "..."]</code></td>
+                            <td>Executes the full 5-gate pipeline from visual input to sliced 3MF or automated LAN print.</td>
+                        </tr>
+                        <tr>
+                            <td><code>vlm-print status</code></td>
+                            <td>Connects to Bambu P1S/X1/A1 over local MQTT TLS and streams live nozzle/bed temperatures and print status.</td>
+                        </tr>
+                        <tr>
+                            <td><code>vlm-print audit &lt;file.stl&gt;</code></td>
+                            <td>Audits a mesh for watertight 2-manifold boundaries and overhang angles exceeding 45°.</td>
+                        </tr>
+                        <tr>
+                            <td><code>vlm-print catalog</code></td>
+                            <td>Prints all 105+ building blocks, scalar parameter boundaries, and standard engineering definitions.</td>
+                        </tr>
+                        <tr>
+                            <td><code>vlm-print serve</code></td>
+                            <td>Starts the Model Context Protocol (FastMCP) server over STDIO for AI coding agents.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- SECTION: License -->
+            <section id="license">
+                <h2 class="section-title">License</h2>
+                <p>
+                    This project is open-source software licensed under the <strong>MIT License</strong>.
+                </p>
+                <p>
+                    Copyright &copy; 2026 shotsan. You are free to use, modify, distribute, and integrate this software into commercial or private workflows.
+                </p>
+            </section>
+
+            <footer>
+                <p>VLM 3D Print Pipeline • Designed for Bambu Lab P1S, X1-Carbon, and A1 Series</p>
+                <p style="margin-top: 8px;">Maintained by <a href="https://github.com/shotsan" target="_blank" style="color: #38bdf8; text-decoration: none;">@shotsan</a></p>
+            </footer>
+
+        </main>
+    </div>
+
+</body>
+</html>

@@ -2,6 +2,9 @@
 
 Autonomous, closed-loop additive manufacturing pipeline connecting Vision-Language Models (VLMs) directly to OpenCASCADE B-Rep solid modeling, headless slicers, and Bambu Lab 3D printers.
 
+📖 **Documentation Site**: [https://shotsan.github.io/vlm-3dprint-pipeline](https://shotsan.github.io/vlm-3dprint-pipeline)  
+📄 **License**: [MIT License](LICENSE)
+
 ## Overview
 
 Rather than having an LLM write unconstrained CAD code (which introduces non-manifold geometry, inverted normals, and dimensional drift), this pipeline enforces a deterministic workflow:
@@ -101,14 +104,17 @@ export BAMBU_ACCESS_CODE="12345678"
 
 ### CLI Usage
 ```bash
+# Automatically install & configure OrcaSlicer headless engine:
+vlm-print setup-slicer
+
+# Launch the interactive Multimodal Web Studio with Three.js CAD viewer and live chat:
+vlm-print studio --port 8000
+
 # View the exhaustive component catalog:
 vlm-print catalog
 
 # Run full pipeline on an image or drawing:
 vlm-print run examples/motor_bracket_sample.png --guidance "Mounting holes fit M3 socket head screws"
-
-# Open the interactive 3D WebGL inspection studio:
-vlm-print view output/motor_bracket_sample/
 
 # Query Bambu P1S telemetry over local LAN MQTT:
 vlm-print status
@@ -119,3 +125,7 @@ vlm-print status
 All printer operations run over your local network without external cloud dependencies:
 - **FTPS (Port 990)**: Implicit TLS file transfer to printer SD card.
 - **MQTT (Port 8883)**: TLS connection for real-time telemetry and print job dispatch.
+
+## License
+
+This project is licensed under the terms of the [MIT License](LICENSE). Copyright &copy; 2026 shotsan.
