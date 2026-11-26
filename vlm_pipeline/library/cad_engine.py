@@ -112,6 +112,69 @@ class IndustrialCADBuilder:
 
         return p.part
 
+    @staticmethod
+    def build_toy_aeroplane(
+        fuselage_length: float = 110.0,
+        wingspan: float = 140.0,
+        wing_thickness: float = 3.0,
+        has_propeller_mount: bool = True
+    ) -> b3d.Part:
+        """Constructs an aerodynamic, 100% 2-manifold printable toy airplane airframe."""
+        half_span = wingspan / 2.0
+        fuse_r = max(6.0, fuselage_length * 0.075)
+
+        with b3d.BuildPart() as plane:
+            # 1. Aerodynamic Fuselage
+            with b3d.BuildSketch(b3d.Plane.YZ):
+                b3d.Circle(radius=fuse_r)
+            b3d.extrude(amount=fuselage_length)
+
+            # 2. Swept Main Wings
+            w_root = fuselage_length * 0.35
+            w_tip = fuselage_length * 0.15
+            with b3d.BuildSketch(b3d.Plane.XY.offset(0.0)):
+                b3d.Polygon([
+                    (fuselage_length * 0.30, -half_span),
+                    (fuselage_length * 0.30 + w_tip, -half_span),
+                    (fuselage_length * 0.30 + w_root, 0.0),
+                    (fuselage_length * 0.30 + w_tip, half_span),
+                    (fuselage_length * 0.30, half_span),
+                    (fuselage_length * 0.25, 0.0)
+                ])
+            b3d.extrude(amount=wing_thickness)
+
+            # 3. Horizontal Stabilizer (Rear)
+            h_span = half_span * 0.4
+            with b3d.BuildSketch(b3d.Plane.XY.offset(1.0)):
+                b3d.Polygon([
+                    (fuselage_length * 0.86, -h_span),
+                    (fuselage_length * 0.94, -h_span),
+                    (fuselage_length * 0.96, 0.0),
+                    (fuselage_length * 0.94, h_span),
+                    (fuselage_length * 0.86, h_span),
+                    (fuselage_length * 0.84, 0.0)
+                ])
+            b3d.extrude(amount=max(2.0, wing_thickness * 0.8))
+
+            # 4. Vertical Stabilizer Fin
+            fin_h = fuse_r * 2.8
+            with b3d.BuildSketch(b3d.Plane.XZ.offset(0.0)):
+                b3d.Polygon([
+                    (fuselage_length * 0.78, fuse_r * 0.5),
+                    (fuselage_length * 0.96, fuse_r * 0.5),
+                    (fuselage_length * 0.94, fin_h),
+                    (fuselage_length * 0.84, fin_h)
+                ])
+            b3d.extrude(amount=max(2.0, wing_thickness * 0.8), both=True)
+
+            # 5. Optional Propeller / Axle Nose Hole
+            if has_propeller_mount:
+                with b3d.BuildSketch(b3d.Plane.YZ):
+                    b3d.Circle(radius=1.75)  # 3.5mm shaft clearance for M3 pin
+                b3d.extrude(amount=15.0, mode=b3d.Mode.SUBTRACT)
+
+        return plane.part
+
     # -------------------------------------------------------------------------
     # 2. INDUSTRIAL FASTENERS (ISO, ASME, Ruthex)
     # -------------------------------------------------------------------------
@@ -296,7 +359,12 @@ class IndustrialCADBuilder:
         d_flat_depth: float = 0.5
     ) -> b3d.Part:
         """Constructs an exact mathematical involute spur gear with center shaft bore."""
-        gear = SpurGear(module=module, teeth_number=teeth_count, width=face_width)
+        gear = SpurGear(
+            module=module,
+            tooth_count=teeth_count,
+            pressure_angle=20.0,
+            thickness=face_width
+        )
 
         with b3d.BuildPart() as p:
             b3d.add(gear)

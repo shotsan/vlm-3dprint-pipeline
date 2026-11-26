@@ -424,5 +424,17 @@ COMPONENT_CATALOG: Dict[str, ComponentDefinition] = {
             ParameterBound(name="thread_type", type="str", default="1/4-20", description="'1/4-20' or '3/8-16'"),
             ParameterBound(name="mount_style", type="str", default="socket", description="'socket' (nut pocket) or 'arca_swiss' (38mm dovetail rail)"),
         ]
+    ),
+    "toy_aeroplane": ComponentDefinition(
+        component_type="toy_aeroplane",
+        category="toys",
+        standard="Aerodynamic Glider / Toy Airframe",
+        description="Printable aerodynamic toy airplane airframe with fuselage, swept wings, and stabilizer fin.",
+        parameters=[
+            ParameterBound(name="fuselage_length", type="float", default=110.0, min_val=40.0, max_val=240.0, description="Total fuselage length"),
+            ParameterBound(name="wingspan", type="float", default=140.0, min_val=40.0, max_val=240.0, description="Wing tip-to-tip span"),
+            ParameterBound(name="wing_thickness", type="float", default=3.0, min_val=1.2, max_val=10.0, description="Airfoil wing thickness"),
+            ParameterBound(name="has_propeller_mount", type="bool", default=True, description="Whether nose has propeller hub hole"),
+        ]
     )
 }

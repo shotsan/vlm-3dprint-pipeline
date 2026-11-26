@@ -49,6 +49,66 @@ slicer = HeadlessSlicer()
 bambu = BambuPrinterController()
 
 
+class SettingsUpdate(BaseModel):
+    provider: str  # "offline", "gemini", "anthropic", "openai"
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+
+
+@app.get("/api/settings")
+async def get_settings():
+    """Returns current active VLM / CAD engine status."""
+    has_key = bool(
+        vlm_client.api_key
+        or os.getenv("GEMINI_API_KEY")
+        or os.getenv("ANTHROPIC_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
+    )
+    return {
+        "provider": vlm_client.provider or "offline",
+        "model": vlm_client.model,
+        "has_api_key": has_key,
+        "available_providers": [
+            {"id": "offline", "name": "Offline Deterministic CAD Engine (No API Key)", "models": ["parametric-rules-v1"]},
+            {"id": "gemini", "name": "Google Gemini (Fast Multimodal)", "models": ["gemini-2.0-flash", "gemini-1.5-pro"]},
+            {"id": "anthropic", "name": "Anthropic Claude (High Fidelity)", "models": ["claude-3-5-sonnet-20241022"]},
+            {"id": "openai", "name": "OpenAI GPT-4o (Vision)", "models": ["gpt-4o", "gpt-4o-mini"]}
+        ]
+    }
+
+
+@app.post("/api/settings")
+async def update_settings(req: SettingsUpdate):
+    """Updates active VLM provider, model, and API key at runtime."""
+    vlm_client.provider = req.provider
+    if req.model:
+        vlm_client.model = req.model
+    if req.api_key:
+        vlm_client.api_key = req.api_key
+        if req.provider == "gemini":
+            os.environ["GEMINI_API_KEY"] = req.api_key
+        elif req.provider == "anthropic":
+            os.environ["ANTHROPIC_API_KEY"] = req.api_key
+        elif req.provider == "openai":
+            os.environ["OPENAI_API_KEY"] = req.api_key
+
+    return {
+        "status": "success",
+        "provider": vlm_client.provider,
+        "model": vlm_client.model,
+        "configured": bool(vlm_client.api_key or req.provider == "offline")
+    }
+
+
+@app.post("/api/reset")
+async def reset_session():
+    """Resets session state so the user can generate a brand new CAD model."""
+    state.assembly_plan = None
+    state.image_path = None
+    state.chat_history = []
+    return {"status": "success", "message": "Session reset. Ready for new component design."}
+
+
 ITERATION_SYSTEM_PROMPT = """You are a senior CAD systems engineer modifying an existing mechanical AssemblyPlan.
 You receive the user's natural language request (and optional visual input) and the current AssemblyPlan JSON.
 
@@ -99,50 +159,65 @@ async def chat_iterate(req: ChatRequest):
 
     state.chat_history.append({"role": "user", "content": user_msg})
 
-    # Case A: Initial Generation
-    if state.assembly_plan is None:
-        if not state.image_path:
-            # Create a sample technical sketch if none uploaded
-            sample_img = SESSION_DIR / "sample.png"
-            from PIL import Image
-            Image.new("RGB", (400, 400), (240, 240, 240)).save(sample_img)
-            state.image_path = sample_img
+    # Check if using offline parametric engine or cloud VLM
+    has_cloud_key = bool(
+        vlm_client.api_key
+        or os.getenv("GEMINI_API_KEY")
+        or os.getenv("ANTHROPIC_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
+    )
+    is_offline = (vlm_client.provider == "offline") or not has_cloud_key
 
-        flow = DeterministicTaskFlow(vlm_client=vlm_client)
-        plan = flow.step1_extract_assembly_plan(state.image_path, user_guidance=user_msg)
+    from vlm_pipeline.workflow.parametric_interpreter import DeterministicParametricInterpreter
+
+    if is_offline:
+        # High-performance local deterministic parametric interpreter
+        plan, assistant_reply = DeterministicParametricInterpreter.process_prompt(
+            prompt=user_msg,
+            current_plan=state.assembly_plan
+        )
         state.assembly_plan = plan
-        assistant_reply = f"Generated initial mechanical assembly: **{plan.part_name}** with {len(plan.components)} components."
-
-    # Case B: Multi-Turn Iterative Revision
     else:
-        iteration_prompt = f"""Update the existing AssemblyPlan based on user request:
+        # Cloud Multimodal VLM (Gemini, Claude, GPT-4o)
+        if state.assembly_plan is None:
+            if not state.image_path:
+                sample_img = SESSION_DIR / "sample.png"
+                from PIL import Image
+                Image.new("RGB", (400, 400), (240, 240, 240)).save(sample_img)
+                state.image_path = sample_img
+
+            flow = DeterministicTaskFlow(vlm_client=vlm_client)
+            plan = flow.step1_extract_assembly_plan(state.image_path, user_guidance=user_msg)
+            state.assembly_plan = plan
+            assistant_reply = f"Generated mechanical assembly: **{plan.part_name}** ({len(plan.components)} components)."
+        else:
+            iteration_prompt = f"""Update the existing AssemblyPlan based on user request:
 User Feedback: "{user_msg}"
 
 Current AssemblyPlan:
 {state.assembly_plan.model_dump_json(indent=2)}
 """
-        img_paths = [state.image_path] if state.image_path and state.image_path.exists() else []
-        raw_output = vlm_client.complete_multimodal(
-            prompt=iteration_prompt,
-            image_paths=img_paths,
-            system_prompt=ITERATION_SYSTEM_PROMPT,
-            temperature=0.0
-        )
+            img_paths = [state.image_path] if state.image_path and state.image_path.exists() else []
+            raw_output = vlm_client.complete_multimodal(
+                prompt=iteration_prompt,
+                image_paths=img_paths,
+                system_prompt=ITERATION_SYSTEM_PROMPT,
+                temperature=0.0
+            )
 
-        # Parse updated plan
-        import re
-        cleaned = raw_output.strip()
-        if "```json" in cleaned:
-            cleaned = cleaned.split("```json")[1].split("```")[0].strip()
-        elif "```" in cleaned:
-            cleaned = cleaned.split("```")[1].split("```")[0].strip()
-        match = re.search(r"\{[\s\S]*\}", cleaned)
-        if match:
-            plan_dict = json.loads(match.group(0))
-            state.assembly_plan = AssemblyPlan(**plan_dict)
-            assistant_reply = f"Applied iterative revisions to **{state.assembly_plan.part_name}**."
-        else:
-            assistant_reply = "Updated parameters."
+            import re
+            cleaned = raw_output.strip()
+            if "```json" in cleaned:
+                cleaned = cleaned.split("```json")[1].split("```")[0].strip()
+            elif "```" in cleaned:
+                cleaned = cleaned.split("```")[1].split("```")[0].strip()
+            match = re.search(r"\{[\s\S]*\}", cleaned)
+            if match:
+                plan_dict = json.loads(match.group(0))
+                state.assembly_plan = AssemblyPlan(**plan_dict)
+                assistant_reply = f"Applied iterative revisions to **{state.assembly_plan.part_name}**."
+            else:
+                assistant_reply = "Updated assembly parameters."
 
     # 2. Compile Updated Geometry via OpenCASCADE
     cad_outputs = AssemblyCompiler.compile_to_cad(state.assembly_plan, SESSION_DIR / "cad")

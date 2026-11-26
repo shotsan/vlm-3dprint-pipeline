@@ -102,6 +102,100 @@
             color: var(--text-secondary);
         }
 
+        .engine-pill {
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #38bdf8;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .engine-pill:hover {
+            background: rgba(56, 189, 248, 0.16);
+            border-color: rgba(56, 189, 248, 0.4);
+        }
+
+        .btn-action-ghost {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .btn-action-ghost:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--border-medium);
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            z-index: 999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-medium);
+            border-radius: 16px;
+            width: 460px;
+            max-width: 90vw;
+            padding: 24px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 12px;
+        }
+        .modal-title { font-size: 15px; font-weight: 600; color: #fff; }
+        .modal-close {
+            background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px;
+        }
+        .modal-close:hover { color: #fff; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+        .form-select, .form-input {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-family: var(--font-sans);
+            font-size: 13px;
+            outline: none;
+        }
+        .form-select:focus, .form-input:focus {
+            border-color: #38bdf8;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding-top: 8px;
+        }
+
         .status-dot {
             width: 7px;
             height: 7px;
@@ -507,16 +601,28 @@
         </div>
 
         <div class="header-actions">
+            <div class="engine-pill" id="enginePill" onclick="openSettingsModal()" title="Click to configure AI / CAD Engine">
+                <div class="status-dot" id="engineDot" style="background: #38bdf8; box-shadow: 0 0 8px #38bdf8;"></div>
+                <span id="engineLabel">Engine: Offline CAD</span>
+            </div>
             <div class="printer-pill">
                 <div class="status-dot"></div>
                 <span id="printerState">Bambu P1S: Ready (LAN)</span>
             </div>
+            <button class="btn-action-ghost" onclick="resetDesign()" title="Start New Design / Clear Session">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M3 21v-5h5"/></svg>
+                New Design
+            </button>
+            <button class="btn-action-ghost" onclick="openSettingsModal()" title="Engine & API Settings">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Settings
+            </button>
             <a href="/api/model.step" class="btn-download-step" id="btnDownloadStep" download>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                Export .STEP
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                .STEP
             </a>
             <button class="btn-print" onclick="dispatchToBambu()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
                 Print on P1S
             </button>
         </div>
@@ -578,9 +684,12 @@
                         <strong>Welcome to Bambu VLM Studio.</strong><br>
                         Attach a technical sketch or photo below, or chat to describe what you want to manufacture.
                         <div class="suggestions-row">
-                            <div class="suggestion-chip" onclick="applySuggestion('Make the plate 100x70mm with 5mm corner fillets')">💡 Expand plate to 100x70mm</div>
-                            <div class="suggestion-chip" onclick="applySuggestion('Change screw holes to M4 clearance')">💡 Change to M4 screws</div>
-                            <div class="suggestion-chip" onclick="applySuggestion('Add a 45-degree reinforcement rib on the top face')">💡 Add reinforcement rib</div>
+                            <div class="suggestion-chip" onclick="applySuggestion('Design a spur gear with 24 teeth and 5mm bore')">⚙️ Spur Gear (24T)</div>
+                            <div class="suggestion-chip" onclick="applySuggestion('Design a toy aeroplane with 140mm wingspan')">✈️ Toy Aeroplane</div>
+                            <div class="suggestion-chip" onclick="applySuggestion('Design an L-bracket 40x40mm with M4 screw hole')">📐 L-Bracket 40x40</div>
+                            <div class="suggestion-chip" onclick="applySuggestion('Design an electronics enclosure box 100x70x35mm')">📦 Enclosure Box</div>
+                            <div class="suggestion-chip" onclick="applySuggestion('Make the plate 100x70mm with 5mm corner fillets')">↔️ Expand to 100x70mm</div>
+                            <div class="suggestion-chip" onclick="applySuggestion('Change screw holes to M4 clearance')">🔩 Switch to M4 Screws</div>
                         </div>
                     </div>
                 </div>
@@ -611,10 +720,159 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this)closeSettingsModal()">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">AI Engine & CAD Provider Settings</div>
+                <button class="modal-close" onclick="closeSettingsModal()">✕</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Active Engine / Provider</label>
+                <select class="form-select" id="providerSelect" onchange="onProviderChange()">
+                    <option value="offline">Offline Deterministic CAD Engine (No API Key Required)</option>
+                    <option value="gemini">Google Gemini (Fast Multimodal 2.0 Flash / Pro)</option>
+                    <option value="anthropic">Anthropic Claude (High Fidelity 3.5 Sonnet)</option>
+                    <option value="openai">OpenAI GPT-4o (Multimodal Vision)</option>
+                </select>
+            </div>
+            <div class="form-group" id="apiKeyGroup" style="display: none;">
+                <label class="form-label" id="apiKeyLabel">API Key</label>
+                <input type="password" class="form-input" id="apiKeyInput" placeholder="Enter API key...">
+                <span style="font-size: 11px; color: var(--text-muted);">Saved in local runtime session. Never transmitted to third parties.</span>
+            </div>
+            <div class="form-group" id="modelGroup" style="display: none;">
+                <label class="form-label">Model Name</label>
+                <input type="text" class="form-input" id="modelInput" placeholder="gemini-2.0-flash">
+            </div>
+            <div class="modal-footer">
+                <button class="btn-action-ghost" onclick="closeSettingsModal()">Cancel</button>
+                <button class="btn-print" onclick="saveSettings()">Save & Connect</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentMode = 'shaded';
         let loadedMesh = null;
         let attachedFile = null;
+
+        // Engine Settings Functions
+        async function loadSettings() {
+            try {
+                const res = await fetch("/api/settings");
+                const data = await res.json();
+                const provider = data.provider || "offline";
+                const label = document.getElementById("engineLabel");
+                const dot = document.getElementById("engineDot");
+
+                if (provider === "offline") {
+                    label.innerText = "Engine: Offline CAD";
+                    dot.style.background = "#38bdf8";
+                    dot.style.boxShadow = "0 0 8px #38bdf8";
+                } else if (provider === "gemini") {
+                    label.innerText = `Engine: Gemini (${data.has_api_key ? 'Connected' : 'No Key'})`;
+                    dot.style.background = data.has_api_key ? "#4ade80" : "#f59e0b";
+                    dot.style.boxShadow = data.has_api_key ? "0 0 8px #4ade80" : "0 0 8px #f59e0b";
+                } else if (provider === "anthropic") {
+                    label.innerText = `Engine: Claude (${data.has_api_key ? 'Connected' : 'No Key'})`;
+                    dot.style.background = data.has_api_key ? "#4ade80" : "#f59e0b";
+                    dot.style.boxShadow = data.has_api_key ? "0 0 8px #4ade80" : "0 0 8px #f59e0b";
+                } else if (provider === "openai") {
+                    label.innerText = `Engine: GPT-4o (${data.has_api_key ? 'Connected' : 'No Key'})`;
+                    dot.style.background = data.has_api_key ? "#4ade80" : "#f59e0b";
+                    dot.style.boxShadow = data.has_api_key ? "0 0 8px #4ade80" : "0 0 8px #f59e0b";
+                }
+
+                document.getElementById("providerSelect").value = provider;
+                onProviderChange();
+            } catch (e) {
+                console.error("Failed to load settings:", e);
+            }
+        }
+
+        function openSettingsModal() {
+            document.getElementById("settingsModal").style.display = "flex";
+        }
+
+        function closeSettingsModal() {
+            document.getElementById("settingsModal").style.display = "none";
+        }
+
+        function onProviderChange() {
+            const p = document.getElementById("providerSelect").value;
+            const keyGrp = document.getElementById("apiKeyGroup");
+            const modelGrp = document.getElementById("modelGroup");
+            const keyLbl = document.getElementById("apiKeyLabel");
+            const modelInp = document.getElementById("modelInput");
+
+            if (p === "offline") {
+                keyGrp.style.display = "none";
+                modelGrp.style.display = "none";
+            } else {
+                keyGrp.style.display = "flex";
+                modelGrp.style.display = "flex";
+                if (p === "gemini") {
+                    keyLbl.innerText = "Google Gemini API Key";
+                    modelInp.value = "gemini-2.0-flash";
+                } else if (p === "anthropic") {
+                    keyLbl.innerText = "Anthropic Claude API Key";
+                    modelInp.value = "claude-3-5-sonnet-20241022";
+                } else if (p === "openai") {
+                    keyLbl.innerText = "OpenAI API Key";
+                    modelInp.value = "gpt-4o";
+                }
+            }
+        }
+
+        async function saveSettings() {
+            const p = document.getElementById("providerSelect").value;
+            const key = document.getElementById("apiKeyInput").value.trim();
+            const model = document.getElementById("modelInput").value.trim();
+
+            try {
+                const res = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ provider: p, api_key: key, model: model })
+                });
+                const data = await res.json();
+                closeSettingsModal();
+                loadSettings();
+                appendBubble("assistant", `⚙️ Engine configuration updated: **${p.toUpperCase()}** ${model ? '(' + model + ')' : ''} is now active.`);
+            } catch (e) {
+                alert("Failed to save settings: " + e.message);
+            }
+        }
+
+        async function resetDesign() {
+            if (!confirm("Start a new CAD design? This will clear the current assembly.")) return;
+            try {
+                await fetch("/api/reset", { method: "POST" });
+                document.getElementById("chatStream").innerHTML = `
+                    <div class="msg-row">
+                        <div class="avatar assistant">✦</div>
+                        <div class="bubble assistant">
+                            <strong>Session reset.</strong> What component would you like to synthesize?<br>
+                            Click a template below or type a description:
+                            <div class="suggestions-row">
+                                <div class="suggestion-chip" onclick="applySuggestion('Design a spur gear with 24 teeth and 5mm bore')">⚙️ Spur Gear (24T)</div>
+                                <div class="suggestion-chip" onclick="applySuggestion('Design a toy aeroplane with 140mm wingspan')">✈️ Toy Aeroplane</div>
+                                <div class="suggestion-chip" onclick="applySuggestion('Design an L-bracket 40x40mm with M4 screw hole')">📐 L-Bracket 40x40</div>
+                                <div class="suggestion-chip" onclick="applySuggestion('Design an electronics enclosure box 100x70x35mm')">📦 Enclosure Box</div>
+                                <div class="suggestion-chip" onclick="applySuggestion('Design an 80x60mm adapter plate with 608 bearing and M3 screw holes')">🔲 Mounting Plate 80x60</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                removeAttachment();
+            } catch (e) {
+                console.error("Reset failed:", e);
+            }
+        }
+
+        // Initialize settings on load
+        loadSettings();
 
         // Three.js Viewport
         const container = document.querySelector(".viewport-section");

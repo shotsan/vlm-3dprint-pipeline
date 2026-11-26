@@ -89,57 +89,35 @@ class VLMClient:
         return response.text or ""
 
     def _offline_demo_response(self, prompt: str, image_paths: List[Path]) -> str:
-        """Deterministic slot-filler fallback for testing without cloud API keys."""
-        print("[VLMClient] Note: No VLM API key configured in environment. Using deterministic offline slot-filler.")
-        return json.dumps({
-            "part_name": "stepper_adapter_plate",
-            "description": "80x60mm mounting plate with center 608 bearing and 4x M3 screw clearance holes",
-            "target_material": "PETG",
-            "components": [
-                {
-                    "instance_id": "base_plate",
-                    "component_type": "mounting_plate",
-                    "operation": "BASE",
-                    "parameters": {"width_x": 80.0, "depth_y": 60.0, "thickness_z": 5.0, "corner_radius": 3.0, "edge_chamfer": 0.5},
-                    "transform": {"translation_mm": [0, 0, 0], "rotation_deg": [0, 0, 0]}
-                },
-                {
-                    "instance_id": "center_bearing",
-                    "component_type": "deep_groove_ball_bearing",
-                    "operation": "DIFFERENCE",
-                    "parameters": {"bearing_standard": "608", "press_fit_clearance_mm": 0.15},
-                    "transform": {"translation_mm": [0, 0, 5.0], "rotation_deg": [0, 0, 0]}
-                },
-                {
-                    "instance_id": "hole_tl",
-                    "component_type": "socket_head_cap_screw",
-                    "operation": "DIFFERENCE",
-                    "parameters": {"size": "M3-0.5", "length": 12.0, "fit": "Normal"},
-                    "transform": {"translation_mm": [-28.0, 18.0, 5.0], "rotation_deg": [0, 0, 0]}
-                },
-                {
-                    "instance_id": "hole_tr",
-                    "component_type": "socket_head_cap_screw",
-                    "operation": "DIFFERENCE",
-                    "parameters": {"size": "M3-0.5", "length": 12.0, "fit": "Normal"},
-                    "transform": {"translation_mm": [28.0, 18.0, 5.0], "rotation_deg": [0, 0, 0]}
-                },
-                {
-                    "instance_id": "hole_bl",
-                    "component_type": "socket_head_cap_screw",
-                    "operation": "DIFFERENCE",
-                    "parameters": {"size": "M3-0.5", "length": 12.0, "fit": "Normal"},
-                    "transform": {"translation_mm": [-28.0, -18.0, 5.0], "rotation_deg": [0, 0, 0]}
-                },
-                {
-                    "instance_id": "hole_br",
-                    "component_type": "socket_head_cap_screw",
-                    "operation": "DIFFERENCE",
-                    "parameters": {"size": "M3-0.5", "length": 12.0, "fit": "Normal"},
-                    "transform": {"translation_mm": [28.0, -18.0, 5.0], "rotation_deg": [0, 0, 0]}
-                }
-            ]
-        })
+        """Deterministic NLP parametric interpreter fallback for offline execution without cloud API keys."""
+        from vlm_pipeline.workflow.parametric_interpreter import DeterministicParametricInterpreter
+        from vlm_pipeline.workflow.schema import AssemblyPlan
+        import re
+
+        user_text = prompt
+        current_plan = None
+
+        # 1. Check if prompt is an iteration prompt containing user feedback and current plan
+        if "User Feedback:" in prompt:
+            m_fb = re.search(r'User Feedback:\s*"(.*?)"', prompt, re.DOTALL)
+            if m_fb:
+                user_text = m_fb.group(1).strip()
+            if "Current AssemblyPlan:" in prompt:
+                plan_json_part = prompt.split("Current AssemblyPlan:")[1].strip()
+                m_json = re.search(r"\{[\s\S]*\}", plan_json_part)
+                if m_json:
+                    try:
+                        current_plan = AssemblyPlan(**json.loads(m_json.group(0)))
+                    except Exception:
+                        pass
+        elif "User Guidance / Critical Dimensions:" in prompt:
+            m_g = re.search(r"User Guidance / Critical Dimensions:\s*(.*?)(?:\n|$)", prompt)
+            if m_g:
+                user_text = m_g.group(1).strip()
+
+        plan, reply = DeterministicParametricInterpreter.process_prompt(user_text, current_plan)
+        print(f"[VLMClient Offline Interpreter] Parsed: '{user_text}' -> Part: {plan.part_name}")
+        return plan.model_dump_json(indent=2)
 
     def _call_anthropic(
         self, prompt: str, image_paths: List[Path], system_prompt: Optional[str], temperature: float

@@ -42,7 +42,7 @@ class AssemblyCompiler:
                 wall_thickness=params.get("wall_thickness", 4.0),
                 gusset_thickness=params.get("gusset_thickness", 3.0)
             )
-        elif base_comp.component_type == "enclosure_shell_box":
+        elif base_comp.component_type in ["enclosure_shell", "enclosure_shell_box"]:
             part = IndustrialCADBuilder.build_enclosure_shell(
                 outer_length=params.get("outer_length", 100.0),
                 outer_width=params.get("outer_width", 70.0),
@@ -50,7 +50,14 @@ class AssemblyCompiler:
                 wall_thickness=params.get("wall_thickness", 2.4),
                 corner_radius=params.get("corner_radius", 4.0)
             )
-        elif base_comp.component_type == "involute_spur_gear":
+        elif base_comp.component_type == "toy_aeroplane":
+            part = IndustrialCADBuilder.build_toy_aeroplane(
+                fuselage_length=params.get("fuselage_length", 110.0),
+                wingspan=params.get("wingspan", 140.0),
+                wing_thickness=params.get("wing_thickness", 3.0),
+                has_propeller_mount=params.get("has_propeller_mount", True)
+            )
+        elif base_comp.component_type in ["involute_spur_gear", "spur_gear"]:
             part = IndustrialCADBuilder.build_involute_spur_gear(
                 module=params.get("module", 1.0),
                 teeth_count=params.get("teeth_count", 24),
@@ -59,7 +66,13 @@ class AssemblyCompiler:
                 d_flat_depth=params.get("d_flat_depth", 0.5)
             )
         else:
-            part = IndustrialCADBuilder.build_mounting_plate(80.0, 60.0, 4.0)
+            part = IndustrialCADBuilder.build_mounting_plate(
+                width_x=params.get("width_x", 80.0),
+                depth_y=params.get("depth_y", 60.0),
+                thickness_z=params.get("thickness_z", 5.0),
+                corner_radius=params.get("corner_radius", 3.0),
+                edge_chamfer=params.get("edge_chamfer", 0.5)
+            )
 
         # 2. Iterate through secondary components
         for comp in plan.components[1:]:
