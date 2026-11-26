@@ -105,37 +105,37 @@ class VLMClient:
                 },
                 {
                     "instance_id": "center_bearing",
-                    "component_type": "ball_bearing_pocket",
+                    "component_type": "deep_groove_ball_bearing",
                     "operation": "DIFFERENCE",
                     "parameters": {"bearing_standard": "608", "press_fit_clearance_mm": 0.15},
                     "transform": {"translation_mm": [0, 0, 5.0], "rotation_deg": [0, 0, 0]}
                 },
                 {
                     "instance_id": "hole_tl",
-                    "component_type": "iso_screw_hole",
+                    "component_type": "socket_head_cap_screw",
                     "operation": "DIFFERENCE",
-                    "parameters": {"size": "M3-0.5", "screw_type": "socket_head", "length": 12.0, "fit": "Normal"},
+                    "parameters": {"size": "M3-0.5", "length": 12.0, "fit": "Normal"},
                     "transform": {"translation_mm": [-28.0, 18.0, 5.0], "rotation_deg": [0, 0, 0]}
                 },
                 {
                     "instance_id": "hole_tr",
-                    "component_type": "iso_screw_hole",
+                    "component_type": "socket_head_cap_screw",
                     "operation": "DIFFERENCE",
-                    "parameters": {"size": "M3-0.5", "screw_type": "socket_head", "length": 12.0, "fit": "Normal"},
+                    "parameters": {"size": "M3-0.5", "length": 12.0, "fit": "Normal"},
                     "transform": {"translation_mm": [28.0, 18.0, 5.0], "rotation_deg": [0, 0, 0]}
                 },
                 {
                     "instance_id": "hole_bl",
-                    "component_type": "iso_screw_hole",
+                    "component_type": "socket_head_cap_screw",
                     "operation": "DIFFERENCE",
-                    "parameters": {"size": "M3-0.5", "screw_type": "socket_head", "length": 12.0, "fit": "Normal"},
+                    "parameters": {"size": "M3-0.5", "length": 12.0, "fit": "Normal"},
                     "transform": {"translation_mm": [-28.0, -18.0, 5.0], "rotation_deg": [0, 0, 0]}
                 },
                 {
                     "instance_id": "hole_br",
-                    "component_type": "iso_screw_hole",
+                    "component_type": "socket_head_cap_screw",
                     "operation": "DIFFERENCE",
-                    "parameters": {"size": "M3-0.5", "screw_type": "socket_head", "length": 12.0, "fit": "Normal"},
+                    "parameters": {"size": "M3-0.5", "length": 12.0, "fit": "Normal"},
                     "transform": {"translation_mm": [28.0, -18.0, 5.0], "rotation_deg": [0, 0, 0]}
                 }
             ]
