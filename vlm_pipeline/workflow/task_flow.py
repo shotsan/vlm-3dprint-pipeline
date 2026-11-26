@@ -80,6 +80,13 @@ Return a valid JSON object matching:
   ]
 }}
 """
+        from PIL import Image
+        img_meta = Image.open(image_path)
+        print(f" -> [VLM Input] Image Path: {image_path.resolve()}")
+        print(f" -> [VLM Input] Resolution: {img_meta.width}x{img_meta.height} px, Format: {img_meta.format}, Size: {image_path.stat().st_size} bytes")
+        print(f" -> [VLM Input] Active Model: {self.client.model} (Provider: {self.client.provider})")
+        print(f" -> [VLM Input] Multimodal Payload: Image bytes + Component Catalog Schema")
+
         # Temperature = 0.0 to eliminate stochastic randomness
         raw_output = self.client.complete_multimodal(
             prompt=user_prompt,
@@ -88,6 +95,7 @@ Return a valid JSON object matching:
             temperature=0.0
         )
 
+        print(f" -> [VLM Output] Received {len(raw_output)} chars from vision model")
         return self._parse_and_validate_plan(raw_output)
 
     def _parse_and_validate_plan(self, text: str) -> AssemblyPlan:

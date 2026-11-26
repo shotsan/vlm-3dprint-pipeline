@@ -40,17 +40,53 @@ class VLMClient:
         temperature: float = 0.2
     ) -> str:
         """Send a prompt with one or more images to the VLM."""
-        api_key = self.api_key or os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY")
+        api_key = (
+            self.api_key
+            or os.getenv("GEMINI_API_KEY")
+            or os.getenv("ANTHROPIC_API_KEY")
+            or os.getenv("OPENAI_API_KEY")
+        )
         if not api_key:
             # Deterministic offline demonstration fallback
             return self._offline_demo_response(prompt, image_paths)
 
-        if self.provider == "anthropic":
+        if self.provider == "gemini" or (not self.provider and os.getenv("GEMINI_API_KEY")):
+            return self._call_gemini(prompt, image_paths, system_prompt, temperature)
+        elif self.provider == "anthropic" or (not self.provider and os.getenv("ANTHROPIC_API_KEY")):
             return self._call_anthropic(prompt, image_paths, system_prompt, temperature)
-        elif self.provider == "openai":
+        elif self.provider == "openai" or (not self.provider and os.getenv("OPENAI_API_KEY")):
             return self._call_openai(prompt, image_paths, system_prompt, temperature)
         else:
-            raise ValueError(f"Unsupported VLM provider: {self.provider}")
+            # Default to gemini if available or fallback
+            if os.getenv("GEMINI_API_KEY"):
+                return self._call_gemini(prompt, image_paths, system_prompt, temperature)
+            raise ValueError(f"Unsupported or unconfigured VLM provider: {self.provider}")
+
+    def _call_gemini(
+        self, prompt: str, image_paths: List[Path], system_prompt: Optional[str], temperature: float
+    ) -> str:
+        from google import genai
+        from PIL import Image
+
+        api_key = self.api_key or os.getenv("GEMINI_API_KEY")
+        client = genai.Client(api_key=api_key)
+
+        contents = []
+        for p in image_paths:
+            contents.append(Image.open(p))
+        contents.append(prompt)
+
+        model_name = self.model if "gemini" in self.model else "gemini-2.0-flash"
+        config = {"temperature": temperature}
+        if system_prompt:
+            config["system_instruction"] = system_prompt
+
+        response = client.models.generate_content(
+            model=model_name,
+            contents=contents,
+            config=config
+        )
+        return response.text or ""
 
     def _offline_demo_response(self, prompt: str, image_paths: List[Path]) -> str:
         """Deterministic slot-filler fallback for testing without cloud API keys."""
